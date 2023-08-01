@@ -8,6 +8,8 @@ from enum import Enum
 import sys
 from antlr4.error.ErrorListener import ErrorListener
 
+output = open('output.ll', 'w')
+
 
 def getstring(str):
     res = ""
@@ -17,18 +19,45 @@ def getstring(str):
             res = res + str[i]
         else:
             if str[i + 1] == '\\':
-                res = res + '\\'
+                res = res + '\\\\'
                 i = i + 1
             elif str[i + 1] == 'n':
-                res = res + '\n'
+                res = res + '\\0A'
                 i = i + 1
             elif str[i + 1] == '\"':
-                res = res + '\"'
+                res = res + '\\22'
                 i = i + 1
             else:
                 raise Exception("Error in getstring:", str)
         i = i + 1
     return res
+
+
+def getstringlength(str):
+    res = ""
+    i = 1
+    size = 0
+    while (i < len(str) - 1):
+        if str[i] != '\\':
+            res = res + str[i]
+            size += 1
+        else:
+            if str[i + 1] == '\\':
+                res = res + '\\\\'
+                i = i + 1
+                size += 1
+            elif str[i + 1] == 'n':
+                res = res + '\\0A'
+                i = i + 1
+                size += 1
+            elif str[i + 1] == '\"':
+                res = res + '\\22'
+                i = i + 1
+                size += 1
+            else:
+                raise Exception("Error in getstring:", str)
+        i = i + 1
+    return size
 
 
 class MyErrorListener(ErrorListener):
@@ -534,6 +563,7 @@ class ASTBuilder:
         self.FuncBank = {}
         self.ClassBank = {}
         self.Scopes = [Scope(type=ScopeEnum.Global)]
+        self.NameSpace = [Scope(type=ScopeEnum.Global)]
         # 数组的内建方法
         self.ClassBank['int'] = ClassScope(id='int', FunctionMember={
             'size': ASTFunctiondeclarationContextNode(t=typeclass(t=typeEnum.INT), id='size', arglist=[])})
@@ -560,6 +590,10 @@ class ASTBuilder:
         self.FuncBank['getInt'] = ASTFunctiondeclarationContextNode(t=typeclass(t=typeEnum.INT), id='getInt')
         self.FuncBank['toString'] = ASTFunctiondeclarationContextNode(t=typeclass(t=typeEnum.STRING), id='toString', arglist=[
             ASTFuncparamContextNode(t=typeclass(t=typeEnum.INT))])
+        self.globalstring = [""]
+        self.llvmfunc = {}
+        self.globalvars = []
+        self.llvmclass = {}
 
     def build(self, node):
         if not isinstance(node, ParserRuleContext):
@@ -594,8 +628,10 @@ class ASTBuilder:
         if type(node.children[0]).__name__ == 'BoolconstexpressionContext':
             return ASTConstExprContextNode(typeclass(typeEnum.BOOL), node.children[0].children[0].symbol.text == "true")
         if type(node.children[0]).__name__ == 'StringconstexpressionContext':
+            if node.children[0].children[0].symbol.text not in self.globalstring:
+                self.globalstring.append(node.children[0].children[0].symbol.text)
             return ASTConstExprContextNode(typeclass(typeEnum.STRING),
-                                           getstring(node.children[0].children[0].symbol.text))
+                                           node.children[0].children[0].symbol.text)
         if type(node.children[0]).__name__ == 'NullconstexpressionContext':
             return ASTConstExprContextNode(typeclass(typeEnum.NULL), None)
         raise Exception("Unknow Error in buildConstExprContext")
@@ -1386,66 +1422,281 @@ class ASTBuilder:
             return True
         return False
 
+    def llvm(self, node):
+        name = "llvm" + type(node).__name__
+        self.__getattribute__(name)(node)
+
+    def llvmASTBodyRootNode(self, node):
+        # 先构建类
+        for name, classscope in self.ClassBank.items():
+            if name != 'int' and name != 'string':
+                self.llvm(classscope)
+        # 构建所有的常量字符串
+        for i in range(len(self.globalstring)):
+            self.globalvars.append(
+                f"@.str.{i} = global [{getstringlength(self.globalstring[i]) + 1} x i8] c\"{getstring(self.globalstring[i])}\\00\"\n")
+        # 构建全局变量
+        for child in node.children:
+            self.llvm(child)
+        for smt in self.globalvars:
+            output.write(smt)
+        for funcname in self.llvmfunc:
+            output.write(f"define {self.llvmfunc[funcname][0]} @{funcname}(")
+            for i in range(len(self.llvmfunc[funcname][1])):
+                if i != 0:
+                    output.write(', ')
+                output.write(self.llvmfunc[funcname][1][i])
+            output.write("){\n")
+            for i in range(len(self.llvmfunc[funcname][2])):
+                for j in range(len(self.llvmfunc[funcname][2][i])):
+                    if j != 0:
+                        output.write('\t')
+                    output.write(self.llvmfunc[funcname][2][i][j])
+                output.write('}\n')
+
+    def llvmClassScope(self, node):
+        self.llvmclass[node.id] = []
+        res = f"%.CLASS.{node.id} = type " + '{ '
+        length = 0
+        for id in node.ClassMember:
+            self.llvmclass[node.id].append(id)
+            if length != 0:
+                res = res + ', '
+            res = res + self.llvmtypeclass(node.ClassMember[id].type)
+            length += 1
+        self.globalvars.append(res + ' }\n')
+
+    def llvmtypeclass(self, typeclass):
+        if typeclass.dim > 0:
+            return 'ptr'
+        elif typeclass.type == typeEnum.CLASS:
+            return 'ptr'
+        elif typeclass.type == typeEnum.INT:
+            return 'i32'
+        elif typeclass.type == typeEnum.BOOL:
+            return 'i1'
+        elif typeclass.type == typeEnum.VOID:
+            return 'void'
+        elif typeclass.type == typeEnum.STRING:
+            return 'ptr'
+        elif typeclass.type == typeEnum.NULL:
+            return 'ptr'
+
+    def llvmASTClassdeclarationContextNode(self, node):
+        pass
+
+    def llvmASTVariabledeclarationNode(self, node):
+        if self.Scopes[-1].type == ScopeEnum.Global:
+            for inits in node.init:
+                self.llvmGlobalInit(node.type, inits)
+        else:
+            raise Exception("TODO")
+
+    def llvmGlobalInit(self, typetodo, init):
+        name = 'llvmGlobalInit' + type(init.expr).__name__
+        self.__getattribute__(name)(typetodo, init)
+
+    def llvmGlobalInitASTConstExprContextNode(self, typetodo, init):
+        if init.expr.type.type in [typeEnum.INT, typeEnum.BOOL]:
+            self.globalvars.append(f"@.{init.id} = global {self.llvmtypeclass(typetodo)} {int(init.expr.value)}\n")
+            self.NameSpace[-1].VarsBank[init.id] = f"@.{init.id}"
+            self.Scopes[-1].VarsBank[init.id] = typetodo
+        elif init.expr.type.type == typeEnum.STRING:
+            self.globalvars.append(f"@.{init.id} = global ptr @.str.{self.globalstring.index(init.expr.value)}\n")
+            self.NameSpace[-1].VarsBank[init.id] = f"@.{init.id}"
+            self.Scopes[-1].VarsBank[init.id] = typetodo
+        elif init.expr.type.type == typeEnum.NULL:
+            self.globalvars.append(f"@.{init.id} = global ptr null\n")
+            self.NameSpace[-1].VarsBank[init.id] = f"@.{init.id}"
+            self.Scopes[-1].VarsBank[init.id] = typetodo
+
+    def llvmGlobalInitASTEmptyNode(self, typetodo, init):
+        if typetodo.type in [typeEnum.INT, typeEnum.BOOL]:
+            self.globalvars.append(f"@.{init.id} = global {self.llvmtypeclass(typetodo)} 0\n")
+            self.NameSpace[-1].VarsBank[init.id] = f"@.{init.id}"
+            self.Scopes[-1].VarsBank[init.id] = typetodo
+        elif typetodo.type == typeEnum.STRING:
+            self.globalvars.append(f"@.{init.id} = global ptr @.str.{self.globalstring.index('')}\n")
+            self.NameSpace[-1].VarsBank[init.id] = f"@.{init.id}"
+            self.Scopes[-1].VarsBank[init.id] = typetodo
+        elif typetodo.type == typeEnum.CLASS:
+            self.globalvars.append(f"@.{init.id} = global ptr null\n")
+            self.NameSpace[-1].VarsBank[init.id] = f"@.{init.id}"
+            self.Scopes[-1].VarsBank[init.id] = typetodo
+
+    def llvmGlobalInitASTIdentifierExprNode(self, typetodo, init):
+        if typetodo.type in [typeEnum.INT, typeEnum.BOOL]:
+            self.globalvars.append(f"@.{init.id} = global {self.llvmtypeclass(typetodo)} 0\n")
+            self.NameSpace[-1].VarsBank[init.id] = f"@.{init.id}"
+            self.Scopes[-1].VarsBank[init.id] = typetodo
+            funcname = f'_init.{len(self.llvmfunc)}'
+            self.Scopes.append(Scope(ScopeEnum.Func))
+            self.llvmfunc[funcname] = ['void', [], [['entry:\n']]]
+            self.generatestore(self.llvmfunc[funcname][2][0], typetodo, init.id, init.expr)
+            self.generateret(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.VOID), ASTEmptyNode())
+            self.Scopes.pop()
+        elif typetodo.type in [typeEnum.STRING, typeEnum.CLASS]:
+            self.globalvars.append(f"@.{init.id} = global ptr null\n")
+            self.NameSpace[-1].VarsBank[init.id] = f"@.{init.id}"
+            self.Scopes[-1].VarsBank[init.id] = typetodo
+            funcname = f'_init.{len(self.llvmfunc)}'
+            self.Scopes.append(Scope(ScopeEnum.Func))
+            self.llvmfunc[funcname] = ['void', [], [['entry:\n']]]
+            self.generatestore(self.llvmfunc[funcname][2][0], typetodo, init.id, init.expr)
+            self.generateret(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.VOID), ASTEmptyNode())
+            self.Scopes.pop()
+
+    def llvmGlobalInitASTNewClassNode(self, typetodo, init):
+        self.globalvars.append(f"@.{init.id} = global ptr null\n")
+        self.NameSpace[-1].VarsBank[init.id] = f"@.{init.id}"
+        self.Scopes[-1].VarsBank[init.id] = typetodo
+        funcname = f'_init.{len(self.llvmfunc)}'
+        self.Scopes.append(Scope(ScopeEnum.Func))
+        self.llvmfunc[funcname] = ['void', [], [['entry:\n']]]
+        self.generatestore(self.llvmfunc[funcname][2][0], typetodo, init.id, init.expr)
+        self.generateret(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.VOID), ASTEmptyNode())
+        self.Scopes.pop()
+
+    def llvmGlobalInitASTMemberVarExprNode(self, typetodo, init):
+        if typetodo.type in [typeEnum.INT, typeEnum.BOOL]:
+            self.globalvars.append(f"@.{init.id} = global {self.llvmtypeclass(typetodo)} 0\n")
+            self.NameSpace[-1].VarsBank[init.id] = f"@.{init.id}"
+            self.Scopes[-1].VarsBank[init.id] = typetodo
+        elif typetodo.type == typeEnum.STRING:
+            self.globalvars.append(f"@.{init.id} = global ptr @.str.{self.globalstring.index('')}\n")
+            self.NameSpace[-1].VarsBank[init.id] = f"@.{init.id}"
+            self.Scopes[-1].VarsBank[init.id] = typetodo
+        elif typetodo.type == typeEnum.CLASS:
+            self.globalvars.append(f"@.{init.id} = global ptr null\n")
+            self.NameSpace[-1].VarsBank[init.id] = f"@.{init.id}"
+            self.Scopes[-1].VarsBank[init.id] = typetodo
+        funcname = f'_init.{len(self.llvmfunc)}'
+        self.Scopes.append(Scope(ScopeEnum.Func))
+        self.llvmfunc[funcname] = ['void', [], [['entry:\n']]]
+        if type(init.expr.body).__name__ != "ASTIdentifierExprNode":
+            newvar = self.generatenewload(self.llvmfunc[funcname][2][0], self.typeget(init.expr.body)[0], init.expr.body)
+            newvar = self.generategetelementptr(self.llvmfunc[funcname][2][0], self.Scopes[-1].VarsBank[newvar], newvar, init.expr.id)
+        else:
+            newvar = self.generategetelementptr(self.llvmfunc[funcname][2][0], self.typeget(init.expr.body)[0],
+                                                self.getname(init.expr.body.id), init.expr.id)
+        if typetodo.type in [typeEnum.INT, typeEnum.BOOL]:
+            newvar = self.generatenewload(self.llvmfunc[funcname][2][0], self.Scopes[-1].VarsBank[newvar], newvar)
+        self.generatestore(self.llvmfunc[funcname][2][0], typetodo, init.id, newvar)
+        self.generateret(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.VOID), ASTEmptyNode())
+        self.Scopes.pop()
+
+    def generatenewload(self, where, typetodo, vars):
+        if type(vars).__name__ == 'ASTIdentifierExprNode':
+            where.append(f"%._{len(where)} = load {self.llvmtypeclass(typetodo)}, ptr {self.getname(vars.id)}\n")
+            self.Scopes[-1].VarsBank[f"%._{len(where) - 1}"] = typetodo
+            return f"%._{len(where) - 1}"
+        elif type(vars).__name__ == 'str':
+            where.append(f"%._{len(where)} = load {self.llvmtypeclass(typetodo)}, ptr {vars}\n")
+            self.Scopes[-1].VarsBank[f"%._{len(where) - 1}"] = typetodo
+            return f"%._{len(where) - 1}"
+        elif type(vars).__name__ == "ASTMemberVarExprNode":
+            if type(vars.body).__name__ != "ASTIdentifierExprNode":
+                newvar = self.generatenewload(where, self.typeget(vars.body)[0], vars.body)
+                newvar = self.generategetelementptr(where, self.Scopes[-1].VarsBank[newvar], newvar, vars.id)
+            else:
+                newvar = self.generategetelementptr(where, self.typeget(vars.body)[0], self.getname(vars.body.id), vars.id)
+            self.Scopes[-1].VarsBank[f"%._{len(where) - 1}"] = typetodo
+            return f"%._{len(where) - 1}"
+
+    def generategetelementptr(self, where, typetodo, target, id):
+        if typetodo.dim > 0:
+            pass
+        elif typetodo.type == typeEnum.CLASS:
+            where.append(
+                f"%._{len(where)} = getelementptr %.CLASS.{typetodo.name}, ptr {target}, i32 {self.llvmclass[typetodo.name].index(id)}\n")
+            self.Scopes[-1].VarsBank[f"%._{len(where) - 1}"] = self.ClassBank[typetodo.name].ClassMember[id].type
+            return f"%._{len(where) - 1}"
+
+    def generatestore(self, where, typetodo, target, value):
+        if type(value).__name__ == 'ASTIdentifierExprNode':
+            newvars = self.generatenewload(where, typetodo, value)
+            where.append(f"store {self.llvmtypeclass(typetodo)} {newvars}, ptr {self.getname(target)}\n")
+        elif type(value).__name__ == 'ASTNewClassNode':
+            newvars = self.generatealloca(where, typetodo)
+            where.append(f"store {self.llvmtypeclass(typetodo)} {newvars}, ptr {self.getname(target)}\n")
+        elif type(value).__name__ == 'str':
+            where.append(f"store {self.llvmtypeclass(typetodo)} {value}, ptr {self.getname(target)}\n")
+
+    def generateret(self, where, typetodo, retNode):
+        if typetodo == typeclass(t=typeEnum.VOID):
+            where.append(f"ret void\n")
+
+    def generatealloca(self, where, typetodo):
+        if typetodo.dim > 0:
+            pass
+        elif typetodo.type == typeEnum.CLASS:
+            where.append(f"%._{len(where)} = alloca %.CLASS.{typetodo.name}\n")
+            return f"%._{len(where) - 1}"
+
+    def getname(self, name):
+        for i in range(len(self.NameSpace) - 1, -1, -1):
+            if name in self.NameSpace[i].VarsBank:
+                return self.NameSpace[i].VarsBank[name]
+
 
 if __name__ == "__main__":
-    root = os.listdir(sys.argv[1])
-    for files in root:
-        if files[-3:] == '.mx':
-            try:
-                print(files + ':', end='')
-                input_stream = FileStream(sys.argv[1] + '\\' + files, encoding="utf-8")
-                lexer = helloLexer(input_stream)
-                lexer._listeners = [MyErrorListener()]
-                stream = CommonTokenStream(lexer)
-                parser = helloParser(stream)
-                parser._listeners = [MyErrorListener()]
-                cst = parser.body()
-                builder = ASTBuilder()
-                ast = builder.build(cst)
-                flag = builder.check(ast)
-            except Exception as e:
-                flag = False
+    # root = os.listdir(sys.argv[1])
+    # for files in root:
+    #     if files[-3:] == '.mx':
+    #         try:
+    #             print(files + ':', end='')
+    #             input_stream = FileStream(sys.argv[1] + '\\' + files, encoding="utf-8")
+    #             lexer = helloLexer(input_stream)
+    #             lexer._listeners = [MyErrorListener()]
+    #             stream = CommonTokenStream(lexer)
+    #             parser = helloParser(stream)
+    #             parser._listeners = [MyErrorListener()]
+    #             cst = parser.body()
+    #             builder = ASTBuilder()
+    #             ast = builder.build(cst)
+    #             flag = builder.check(ast)
+    #         except Exception as e:
+    #             flag = False
+    #
+    #         f5 = open(sys.argv[1] + '\\' + files, encoding="utf-8")
+    #         content = f5.readlines()
+    #         f5.close()
+    #         print(('Verdict: Success\n' in content) == flag)
+    #     elif files[-3:] == 'txt':
+    #         continue
+    #     else:
+    #         subfile = os.listdir(sys.argv[1] + '\\' + files)
+    #         for file in subfile:
+    #             try:
+    #                 print(files + '\\' + file + ':', end='')
+    #                 input_stream = FileStream(sys.argv[1] + '\\' + files + '\\' + file, encoding="utf-8")
+    #                 lexer = helloLexer(input_stream)
+    #                 lexer._listeners = [MyErrorListener()]
+    #                 stream = CommonTokenStream(lexer)
+    #                 parser = helloParser(stream)
+    #                 parser._listeners = [MyErrorListener()]
+    #                 cst = parser.body()
+    #                 builder = ASTBuilder()
+    #                 ast = builder.build(cst)
+    #                 flag = builder.check(ast)
+    #             except Exception as e:
+    #                 flag = False
+    #
+    #             f5 = open(sys.argv[1] + '\\' + files + '\\' + file, encoding="utf-8")
+    #             content = f5.readlines()
+    #             f5.close()
+    #             print(('Verdict: Success\n' in content) == flag)
 
-            f5 = open(sys.argv[1] + '\\' + files, encoding="utf-8")
-            content = f5.readlines()
-            f5.close()
-            print(('Verdict: Success\n' in content) == flag)
-        elif files[-3:] == 'txt':
-            continue
-        else:
-            subfile = os.listdir(sys.argv[1] + '\\' + files)
-            for file in subfile:
-                try:
-                    print(files + '\\' + file + ':', end='')
-                    input_stream = FileStream(sys.argv[1] + '\\' + files + '\\' + file, encoding="utf-8")
-                    lexer = helloLexer(input_stream)
-                    lexer._listeners = [MyErrorListener()]
-                    stream = CommonTokenStream(lexer)
-                    parser = helloParser(stream)
-                    parser._listeners = [MyErrorListener()]
-                    cst = parser.body()
-                    builder = ASTBuilder()
-                    ast = builder.build(cst)
-                    flag = builder.check(ast)
-                except Exception as e:
-                    flag = False
-
-                f5 = open(sys.argv[1] + '\\' + files + '\\' + file, encoding="utf-8")
-                content = f5.readlines()
-                f5.close()
-                print(('Verdict: Success\n' in content) == flag)
-
-    # try:
-    #     input_stream = FileStream(r"C:\Users\14908\Desktop\PPCA\Complier\test.txt", encoding="utf-8")
-    #     lexer = helloLexer(input_stream)
-    #     lexer._listeners = [MyErrorListener()]
-    #     stream = CommonTokenStream(lexer)
-    #     parser = helloParser(stream)
-    #     parser._listeners = [MyErrorListener()]
-    #     cst = parser.body()
-    #     builder = ASTBuilder()
-    #     ast = builder.build(cst)
-    #     flag = builder.check(ast)
-    #     print(flag)
-    # except Exception as e:
-    #     print(e)
+    input_stream = FileStream(r"C:\Users\14908\Desktop\PPCA\Complier\test.txt", encoding="utf-8")
+    lexer = helloLexer(input_stream)
+    lexer._listeners = [MyErrorListener()]
+    stream = CommonTokenStream(lexer)
+    parser = helloParser(stream)
+    parser._listeners = [MyErrorListener()]
+    cst = parser.body()
+    builder = ASTBuilder()
+    ast = builder.build(cst)
+    flag = builder.check(ast)
+    print(flag)
+    builder.llvm(ast)
+    output.close()

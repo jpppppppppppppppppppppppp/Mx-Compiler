@@ -29,8 +29,8 @@ expression
     :   lhsexpression                                                                                                   # LhsExpr
     |   constexpression                                                                                                 # ConstExpr
     |   newexpression                                                                                                   # NewExpr
-    |   lhs=expression op=('++'|'--')                                                                                # PostfixUpdateExpr
-    |   op=('++'|'--') expression                                                                                    # PrefixUpdateExpr
+    |   lhs=expression op=('++'|'--')                                                                                   # PostfixUpdateExpr
+    |   op=('++'|'--') expression                                                                                       # PrefixUpdateExpr
     |   <assoc=right> op=('!'|'-'|'+'|'~') rhs=expression                                                               # UnaryExpr
     |   <assoc=right> lhs=expression op='**' rhs=expression                                                             # ExpExpr
     |   lhs=expression op=('*'|'/'|'%') rhs=expression                                                                  # BinaryExpr
