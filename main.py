@@ -1675,8 +1675,7 @@ class ASTBuilder:
         if typetodo.dim > 0:
             pass
         elif typetodo.type == typeEnum.CLASS:
-            where.append(
-                f"%._{len(where)} = getelementptr %.CLASS.{typetodo.name}, ptr {target}, i32 {self.llvmclass[typetodo.name].index(id)}\n")
+            where.append(f"%._{len(where)} = getelementptr %.CLASS.{typetodo.name}, ptr {target}, i32 {self.llvmclass[typetodo.name].index(id)}\n")
             self.Scopes[-1].VarsBank[f"%._{len(where) - 1}"] = self.ClassBank[typetodo.name].ClassMember[id].type
             self.NameSpace[-1].VarsBank[f"%._{len(where) - 1}"] = f"%._{len(where) - 1}"
             return f"%._{len(where) - 1}"
