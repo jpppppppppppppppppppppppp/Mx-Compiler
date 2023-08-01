@@ -556,6 +556,7 @@ class ClassScope:
         self.ClassMember = ClassMember
         self.FunctionMember = FunctionMember
         self.id = id
+        self.ConstructFunc = ASTEmptyNode()
 
 
 class ASTBuilder:
@@ -594,6 +595,8 @@ class ASTBuilder:
         self.llvmfunc = {}
         self.globalvars = []
         self.llvmclass = {}
+        self.symbol = {'+': 'add', '-': 'sub', '*': 'mul', '/': 'sdiv', '%': 'srem', '<<': 'shl', '>>': 'ashr', '&': 'and', '^': 'xor',
+                       '|': 'or', }
 
     def build(self, node):
         if not isinstance(node, ParserRuleContext):
@@ -704,7 +707,11 @@ class ASTBuilder:
         return ASTBinaryExprNode(op=node.op.text, lhs=self.build(node.lhs), rhs=self.build(node.rhs))
 
     def buildBinaryExprContext(self, node):
-        return ASTBinaryExprNode(op=node.op.text, lhs=self.build(node.lhs), rhs=self.build(node.rhs))
+        res = ASTBinaryExprNode(op=node.op.text, lhs=self.build(node.lhs), rhs=self.build(node.rhs))
+        if type(res.lhs).__name__ == "ASTConstExprContextNode" and type(res.rhs).__name__ == "ASTConstExprContextNode":
+            if res.lhs.type.type == typeEnum.INT and res.rhs.type.type == typeEnum.INT:
+                return ASTConstExprContextNode(t=typeclass(t=typeEnum.INT), v=eval(str(res.lhs.value) + res.op + str(res.rhs.value)))
+        return res
 
     def buildAssignExprContext(self, node):
         return ASTAssignExprNode(lhs=self.build(node.children[0]), rhs=self.build(node.children[2]))
@@ -878,6 +885,7 @@ class ASTBuilder:
             elif type(child).__name__ == 'ASTClassdeclarationContextNode':
                 if (child.id not in self.FuncBank) and (child.id not in self.ClassBank):
                     self.ClassBank[child.id] = ClassScope(id=child.id, FunctionMember={}, ClassMember={})
+                    self.ClassBank[child.id].ConstructFunc = child.ConstructFunc
                     for classmember in child.ClassMember:
                         for ids in classmember.init:
                             if ids.id not in self.ClassBank[child.id].ClassMember:
@@ -1452,7 +1460,7 @@ class ASTBuilder:
                     if j != 0:
                         output.write('\t')
                     output.write(self.llvmfunc[funcname][2][i][j])
-                output.write('}\n')
+                output.write('}\n\n')
 
     def llvmClassScope(self, node):
         self.llvmclass[node.id] = []
@@ -1465,6 +1473,8 @@ class ASTBuilder:
             res = res + self.llvmtypeclass(node.ClassMember[id].type)
             length += 1
         self.globalvars.append(res + ' }\n')
+        if self.ClassBank[node.id].ConstructFunc != ASTEmptyNode():
+            self.llvmfunc[f".CLASS.{node.id}.{node.id}"] = ['void', ['ptr %.this'], [['entry:\n']]]
 
     def llvmtypeclass(self, typeclass):
         if typeclass.dim > 0:
@@ -1554,6 +1564,8 @@ class ASTBuilder:
         self.Scopes.append(Scope(ScopeEnum.Func))
         self.llvmfunc[funcname] = ['void', [], [['entry:\n']]]
         self.generatestore(self.llvmfunc[funcname][2][0], typetodo, init.id, init.expr)
+        if self.ClassBank[typetodo.name].ConstructFunc != ASTEmptyNode():
+            self.generateFuncCall(self.llvmfunc[funcname][2][0], f".CLASS.{typetodo.name}.{typetodo.name}", [init.id], None)
         self.generateret(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.VOID), ASTEmptyNode())
         self.Scopes.pop()
 
@@ -1585,14 +1597,38 @@ class ASTBuilder:
         self.generateret(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.VOID), ASTEmptyNode())
         self.Scopes.pop()
 
+    def llvmGlobalInitASTBinaryExprNode(self, typetodo, init):
+        if typetodo.type == typeEnum.INT:
+            self.globalvars.append(f"@.{init.id} = global {self.llvmtypeclass(typetodo)} 0\n")
+            self.NameSpace[-1].VarsBank[init.id] = f"@.{init.id}"
+            self.Scopes[-1].VarsBank[init.id] = typetodo
+            funcname = f'_init.{len(self.llvmfunc)}'
+            self.Scopes.append(Scope(ScopeEnum.Func))
+            self.llvmfunc[funcname] = ['void', [], [['entry:\n']]]
+            if type(init.expr.lhs).__name__ == "ASTConstExprContextNode":
+                lhsnewvar = str(init.expr.lhs.value)
+            else:
+                lhsnewvar = self.generatenewload(self.llvmfunc[funcname][2][0], typetodo, init.expr.lhs)
+            if type(init.expr.rhs).__name__ == "ASTConstExprContextNode":
+                rhsnewvar = str(init.expr.rhs.value)
+            else:
+                rhsnewvar = self.generatenewload(self.llvmfunc[funcname][2][0], typetodo, init.expr.rhs)
+            var = f"%._{len(self.llvmfunc[funcname][2][0])}"
+            self.generateFuncCall(self.llvmfunc[funcname][2][0], init.expr.op, [lhsnewvar, rhsnewvar], var)
+            self.generatestore(self.llvmfunc[funcname][2][0], typetodo, init.id, var)
+            self.generateret(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.VOID), ASTEmptyNode())
+            self.Scopes.pop()
+
     def generatenewload(self, where, typetodo, vars):
         if type(vars).__name__ == 'ASTIdentifierExprNode':
             where.append(f"%._{len(where)} = load {self.llvmtypeclass(typetodo)}, ptr {self.getname(vars.id)}\n")
             self.Scopes[-1].VarsBank[f"%._{len(where) - 1}"] = typetodo
+            self.NameSpace[-1].VarsBank[f"%._{len(where) - 1}"] = f"%._{len(where) - 1}"
             return f"%._{len(where) - 1}"
         elif type(vars).__name__ == 'str':
             where.append(f"%._{len(where)} = load {self.llvmtypeclass(typetodo)}, ptr {vars}\n")
             self.Scopes[-1].VarsBank[f"%._{len(where) - 1}"] = typetodo
+            self.NameSpace[-1].VarsBank[f"%._{len(where) - 1}"] = f"%._{len(where) - 1}"
             return f"%._{len(where) - 1}"
         elif type(vars).__name__ == "ASTMemberVarExprNode":
             if type(vars.body).__name__ != "ASTIdentifierExprNode":
@@ -1601,7 +1637,39 @@ class ASTBuilder:
             else:
                 newvar = self.generategetelementptr(where, self.typeget(vars.body)[0], self.getname(vars.body.id), vars.id)
             self.Scopes[-1].VarsBank[f"%._{len(where) - 1}"] = typetodo
+            self.NameSpace[-1].VarsBank[f"%._{len(where) - 1}"] = f"%._{len(where) - 1}"
             return f"%._{len(where) - 1}"
+        elif type(vars).__name__ == "ASTConstExprContextNode":
+            if vars.type.type in [typeEnum.INT, typeEnum.BOOL]:
+                where.append(f"%._{len(where)} = alloca {self.llvmtypeclass(typetodo)}\n")
+                var = f"%._{len(where) - 1}"
+                self.Scopes[-1].VarsBank[f"%._{len(where) - 1}"] = typetodo
+                self.NameSpace[-1].VarsBank[f"%._{len(where) - 1}"] = f"%._{len(where) - 1}"
+                self.generatestore(where, typetodo, f"%._{len(where) - 1}", vars)
+                var = self.generatenewload(where, typetodo, var)
+            elif vars.type.type == typeEnum.STRING:
+                where.append(f"%._{len(where)} = ptr @.str.{self.globalstring.index(init.expr.value)}\n")
+                self.Scopes[-1].VarsBank[f"%._{len(where) - 1}"] = typetodo
+                self.NameSpace[-1].VarsBank[f"%._{len(where) - 1}"] = f"%._{len(where) - 1}"
+            elif vars.type.type == typeEnum.NULL:
+                where.append(f"%._{len(where)} = alloca {self.llvmtypeclass(typetodo)}\n")
+                var = f"%._{len(where) - 1}"
+                self.Scopes[-1].VarsBank[f"%._{len(where) - 1}"] = typetodo
+                self.NameSpace[-1].VarsBank[f"%._{len(where) - 1}"] = f"%._{len(where) - 1}"
+                self.generatestore(where, typetodo, f"%._{len(where) - 1}", vars)
+            return var
+        elif type(vars).__name__ == "ASTBinaryExprNode":
+            if typetodo.type == typeEnum.INT:
+                if type(vars.lhs).__name__ == "ASTConstExprContextNode":
+                    lhsnewvar = str(vars.lhs.value)
+                else:
+                    lhsnewvar = self.generatenewload(where, typetodo, vars.lhs)
+                if type(vars.rhs).__name__ == "ASTConstExprContextNode":
+                    rhsnewvar = str(vars.rhs.value)
+                else:
+                    rhsnewvar = self.generatenewload(where, typetodo, vars.rhs)
+                self.generateFuncCall(where, vars.op, [lhsnewvar, rhsnewvar], f"%._{len(where)}")
+                return f"%._{len(where) - 1}"
 
     def generategetelementptr(self, where, typetodo, target, id):
         if typetodo.dim > 0:
@@ -1610,6 +1678,7 @@ class ASTBuilder:
             where.append(
                 f"%._{len(where)} = getelementptr %.CLASS.{typetodo.name}, ptr {target}, i32 {self.llvmclass[typetodo.name].index(id)}\n")
             self.Scopes[-1].VarsBank[f"%._{len(where) - 1}"] = self.ClassBank[typetodo.name].ClassMember[id].type
+            self.NameSpace[-1].VarsBank[f"%._{len(where) - 1}"] = f"%._{len(where) - 1}"
             return f"%._{len(where) - 1}"
 
     def generatestore(self, where, typetodo, target, value):
@@ -1621,6 +1690,25 @@ class ASTBuilder:
             where.append(f"store {self.llvmtypeclass(typetodo)} {newvars}, ptr {self.getname(target)}\n")
         elif type(value).__name__ == 'str':
             where.append(f"store {self.llvmtypeclass(typetodo)} {value}, ptr {self.getname(target)}\n")
+        elif type(value).__name__ == "ASTConstExprContextNode":
+            if value.type.type in [typeEnum.INT, typeEnum.BOOL]:
+                where.append(f"store {self.llvmtypeclass(typetodo)} {value.value}, ptr {self.getname(target)}\n")
+            elif value.type.type == typeEnum.STRING:
+                where.append(f"store ptr @.str.{self.globalstring.index(value.value)}, ptr {self.getname(target)}\n")
+            elif value.type.type == typeEnum.NULL:
+                where.append(f"store ptr null, ptr {self.getname(target)}\n")
+
+    def generateFuncCall(self, where, funcname, arglist, retwhere):
+        if funcname in self.symbol:
+            where.append(f"{retwhere} = {self.symbol[funcname]} i32 {arglist[0]}, {arglist[1]}\n")
+        elif self.llvmfunc[funcname][0] == 'void':
+            res = f"call void @{funcname}("
+            for i in range(len(arglist)):
+                if i != 0:
+                    res = res + ', '
+                res = res + self.llvmtypeclass(self.gettype(arglist[i])) + ' ' + self.getname(arglist[i])
+            res = res + ')\n'
+            where.append(res)
 
     def generateret(self, where, typetodo, retNode):
         if typetodo == typeclass(t=typeEnum.VOID):
@@ -1637,6 +1725,11 @@ class ASTBuilder:
         for i in range(len(self.NameSpace) - 1, -1, -1):
             if name in self.NameSpace[i].VarsBank:
                 return self.NameSpace[i].VarsBank[name]
+
+    def gettype(self, name):
+        for i in range(len(self.Scopes) - 1, -1, -1):
+            if name in self.Scopes[i].VarsBank:
+                return self.Scopes[i].VarsBank[name]
 
 
 if __name__ == "__main__":
@@ -1686,6 +1779,9 @@ if __name__ == "__main__":
     #             content = f5.readlines()
     #             f5.close()
     #             print(('Verdict: Success\n' in content) == flag)
+
+    # sys.stdin = codecs.getreader('utf-8')(sys.stdin)
+    # input_stream = StdinStream()
 
     input_stream = FileStream(r"C:\Users\14908\Desktop\PPCA\Complier\test.txt", encoding="utf-8")
     lexer = helloLexer(input_stream)
