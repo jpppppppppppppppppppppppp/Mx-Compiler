@@ -1744,7 +1744,7 @@ class ASTBuilder:
                     self.Scopes[-1].tempvar += 1
                     self.NameSpace[-1].VarsBank[rhsnewvar] = rhsnewvar
                     self.Scopes[-1].VarsBank[rhsnewvar] = typetodo
-                    self.generatenewload(self.llvmfunc[funcname][2][0], typetodo, init.expr.rhs, rhsnewvar)
+                    self.generateload(self.llvmfunc[funcname][2][0], typetodo, init.expr.rhs, rhsnewvar)
                 var = f"%._{self.Scopes[-1].tempvar}"
                 self.Scopes[-1].tempvar += 1
                 self.generateFuncCall(self.llvmfunc[funcname][2][0], None, init.expr.op, [lhsnewvar, rhsnewvar], var)
