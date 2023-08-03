@@ -599,6 +599,7 @@ class ASTBuilder:
         self.llvmclass = {}
         self.symbol = {'+': 'add', '-': 'sub', '*': 'mul', '/': 'sdiv', '%': 'srem', '<<': 'shl', '>>': 'ashr', '&': 'and', '^': 'xor',
                        '|': 'or', }
+        self.logic = {'==': 'eq', '!=': 'ne', '>': 'sgt', '<': 'slt', '>=': 'sge', '<=': 'sle'}
 
     def build(self, node):
         if not isinstance(node, ParserRuleContext):
@@ -718,7 +719,10 @@ class ASTBuilder:
         res = ASTBinaryExprNode(op=node.op.text, lhs=self.build(node.lhs), rhs=self.build(node.rhs))
         if type(res.lhs).__name__ == "ASTConstExprContextNode" and type(res.rhs).__name__ == "ASTConstExprContextNode":
             if res.lhs.type.type == typeEnum.INT and res.rhs.type.type == typeEnum.INT:
-                return ASTConstExprContextNode(t=typeclass(t=typeEnum.INT), v=eval(str(res.lhs.value) + res.op + str(res.rhs.value)))
+                if res.op in ['+', '-', '*', '/', '%', '<<', '>>', '&', '|', '^']:
+                    return ASTConstExprContextNode(t=typeclass(t=typeEnum.INT), v=eval(str(res.lhs.value) + res.op + str(res.rhs.value)))
+                elif res.op in ['<', '>', '<=', '>=', '==', '!=']:
+                    return ASTConstExprContextNode(t=typeclass(t=typeEnum.BOOL), v=eval(str(res.lhs.value) + res.op + str(res.rhs.value)))
             elif res.lhs.type.type == typeEnum.BOOL and res.rhs.type.type == typeEnum.BOOL:
                 if res.op == '&&':
                     return ASTConstExprContextNode(t=typeclass(t=typeEnum.BOOL), v=res.lhs.value & res.rhs.value)
@@ -1474,11 +1478,13 @@ class ASTBuilder:
                 output.write(self.llvmfunc[funcname][1][i][0] + ' ' + self.llvmfunc[funcname][1][i][1])
             output.write("){\n")
             for i in range(len(self.llvmfunc[funcname][2])):
-                for j in range(len(self.llvmfunc[funcname][2][i])):
-                    if j != 0:
-                        output.write('\t')
-                    output.write(self.llvmfunc[funcname][2][i][j])
-                output.write('}\n\n')
+                if len(self.llvmfunc[funcname][2][i]) > 1:
+                    for j in range(len(self.llvmfunc[funcname][2][i])):
+                        if j != 0:
+                            output.write('\t')
+                        output.write(self.llvmfunc[funcname][2][i][j])
+                    output.write('\n')
+            output.write('}\n')
 
     def llvmClassScope(self, node):
         self.llvmclass[node.id] = []
@@ -1513,8 +1519,11 @@ class ASTBuilder:
     def llvmASTClassdeclarationContextNode(self, node):
         pass
 
+    def llvmASTEmptyNode(self, node):
+        return
+
     def llvmASTFunctiondeclarationContextNode(self, node):
-        funcname = f"__.{node.id}"
+        funcname = f"{node.id}"
         self.llvmfunc[funcname] = [self.llvmtypeclass(node.retType), [], [['entry:\n']]]
         self.Scopes.append(Scope(type=ScopeEnum.Func, name=funcname, dim=0, tempvar=0))
         self.NameSpace.append(Scope(type=ScopeEnum.Func, name=funcname, dim=0))
@@ -1549,7 +1558,7 @@ class ASTBuilder:
                 self.Scopes[-1].VarsBank[init.id] = typetodo
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
-            varname = f"%.{init.id}.{len(self.Scopes)}"
+            varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
             if typetodo.type in [typeEnum.INT, typeEnum.BOOL]:
@@ -1578,7 +1587,7 @@ class ASTBuilder:
                 self.Scopes[-1].VarsBank[init.id] = typetodo
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
-            varname = f"%.{init.id}.{len(self.Scopes)}"
+            varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
             if typetodo.type in [typeEnum.INT, typeEnum.BOOL]:
@@ -1619,7 +1628,7 @@ class ASTBuilder:
                 self.NameSpace.pop()
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
-            varname = f"%.{init.id}.{len(self.Scopes)}"
+            varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
             if typetodo.type in [typeEnum.INT, typeEnum.BOOL]:
@@ -1648,7 +1657,7 @@ class ASTBuilder:
             self.NameSpace.pop()
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
-            varname = f"%.{init.id}.{len(self.Scopes)}"
+            varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
             self.generatealloca(where, typetodo, varname)
@@ -1697,7 +1706,7 @@ class ASTBuilder:
             self.NameSpace.pop()
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
-            varname = f"%.{init.id}.{len(self.Scopes)}"
+            varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
             self.generatealloca(where, typetodo, varname)
@@ -1755,7 +1764,7 @@ class ASTBuilder:
             # 短路求值TODO
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
-            varname = f"%.{init.id}.{len(self.Scopes)}"
+            varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
             self.generatealloca(where, typetodo, varname)
@@ -1824,7 +1833,7 @@ class ASTBuilder:
             self.NameSpace.pop()
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
-            varname = f"%.{init.id}.{len(self.Scopes)}"
+            varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
             self.generatealloca(where, typetodo, varname)
@@ -1858,6 +1867,261 @@ class ASTBuilder:
                 self.generateFuncCall(where, None, '!', [newvar, 'true'], var)
                 self.generatestore(where, typetodo, init.id, var)
 
+    def llvmASTPostfixUpdateExprNode(self, node):
+        where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
+        if type(node.body).__name__ == "ASTIdentifierExprNode":
+            newvar = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            self.generateload(where, typeclass(t=typeEnum.INT), node.body, newvar)
+            newvars = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            if node.op == '++':
+                self.generateFuncCall(where, None, '+', [newvar, '1'], newvars)
+            else:
+                self.generateFuncCall(where, None, '-', [newvar, '1'], newvars)
+            self.generatestore(where, typeclass(t=typeEnum.INT), node.body.id, newvars)
+        else:
+            raise Exception("TODO")
+
+    def llvmASTControlNode(self, node):
+        where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
+        if node.cmd == 'Return':
+            if node.returnExpr == ASTEmptyNode():
+                self.generateret(where, typeclass(t=typeEnum.VOID), None)
+            elif type(node.returnExpr).__name__ == "ASTConstExprContextNode":
+                self.generateret(where, self.typeget(node.returnExpr)[0], str(int(node.returnExpr.value)))
+            else:
+                newvar = f"%._{self.Scopes[-1].tempvar}"
+                self.Scopes[-1].tempvar += 1
+                self.generateload(where, self.typeget(node.returnExpr)[0], node.returnExpr, newvar)
+                self.generateret(where, self.typeget(node.returnExpr)[0], newvar)
+
+        else:
+            raise Exception("TODO")
+
+    def llvmASTBranchStatementNode(self, node):
+        root = self.llvmfunc[self.getfuncname()][2]
+        if type(node.condition).__name__ == "ASTConstExprContextNode":
+            if node.condition.value and ((node.ifSmt != ASTEmptyNode()) and (type(node.ifSmt).__name__ != "ASTBlockSmtNode" or (len(node.ifSmt.Smt) != 0))):
+                ifSmtind = len(root)
+                ifSmt = f"ifSmt.{len(root)}"
+                root.append([f'ifSmt.{len(root)}:\n'])
+                endSmtind = len(root)
+                endSmt = f"ifendSmt.{len(root)}"
+                root.append([f'ifendSmt.{len(root)}:\n'])
+                self.generatejump(root[self.Scopes[-1].dim], ifSmt)
+                self.Scopes.append(Scope(type=ScopeEnum.Loop, name='', dim=self.Scopes[-1].dim, tempvar=self.Scopes[-1].tempvar))
+                self.NameSpace.append(Scope(type=ScopeEnum.Loop, name='', dim=self.Scopes[-1].dim, tempvar=0))
+                self.Scopes[-1].dim = ifSmtind
+                self.Scopes[-1].tempvar = self.Scopes[-2].tempvar
+                if type(node.ifSmt).__name__ == "ASTBlockSmtNode":
+                    for smt in node.ifSmt.Smt:
+                        self.llvm(smt)
+                else:
+                    self.llvm(node.ifSmt)
+                self.generatejump(root[self.Scopes[-1].dim], endSmt)
+                self.Scopes[-2].dim = endSmtind
+                self.Scopes[-2].tempvar = self.Scopes[-1].tempvar
+                self.Scopes.pop()
+                self.NameSpace.pop()
+            if not node.condition.value and (
+                    (node.elseSmt != ASTEmptyNode()) and (type(node.elseSmt).__name__ != "ASTBlockSmtNode" or (len(node.elseSmt.Smt) != 0))):
+                elseSmtind = len(root)
+                elseSmt = f"ifSmt.{len(root)}"
+                root.append([f'elseSmt.{len(root)}:\n'])
+                endSmtind = len(root)
+                endSmt = f"ifendSmt.{len(root)}"
+                root.append([f'ifendSmt.{len(root)}:\n'])
+                self.generatejump(root[self.Scopes[-1].dim], elseSmt)
+                self.Scopes.append(Scope(type=ScopeEnum.Loop, name='', dim=self.Scopes[-1].dim, tempvar=self.Scopes[-1].tempvar))
+                self.NameSpace.append(Scope(type=ScopeEnum.Loop, name='', dim=self.Scopes[-1].dim, tempvar=0))
+                self.Scopes[-1].dim = elseSmtind
+                self.Scopes[-1].tempvar = self.Scopes[-2].tempvar
+                if type(node.elseSmt).__name__ == "ASTBlockSmtNode":
+                    for smt in node.elseSmt.Smt:
+                        self.llvm(smt)
+                else:
+                    self.llvm(node.elseSmt)
+                self.generatejump(root[self.Scopes[-1].dim], endSmt)
+                self.Scopes[-2].dim = endSmtind
+                self.Scopes[-2].tempvar = self.Scopes[-1].tempvar
+                self.Scopes.pop()
+                self.NameSpace.pop()
+        else:
+            newvar = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            self.generateload(root[self.Scopes[-1].dim], typeclass(t=typeEnum.BOOL), node.condition, newvar)
+            if node.ifSmt != ASTEmptyNode():
+                ifSmtind = len(root)
+                ifSmt = f"ifSmt.{len(root)}"
+                root.append([f'ifSmt.{len(root)}:\n'])
+            else:
+                ifSmtind = -1
+            if node.elseSmt != ASTEmptyNode():
+                elseSmtind = len(root)
+                elseSmt = f"elseSmt.{len(root)}"
+                root.append([f'elseSmt.{len(root)}:\n'])
+                endSmtind = len(root)
+                endSmt = f"ifendSmt.{len(root)}"
+                root.append([f'ifendSmt.{len(root)}:\n'])
+                self.generatebranch(root[self.Scopes[-1].dim], newvar, ifSmt, elseSmt)
+            else:
+                endSmtind = len(root)
+                endSmt = f"ifendSmt.{len(root)}"
+                root.append([f'ifendSmt.{len(root)}:\n'])
+                elseSmtind = -1
+                self.generatebranch(root[self.Scopes[-1].dim], newvar, ifSmt, endSmt)
+
+            if ifSmtind != -1:
+                self.Scopes.append(Scope(type=ScopeEnum.Loop, name='', dim=self.Scopes[-1].dim, tempvar=self.Scopes[-1].tempvar))
+                self.NameSpace.append(Scope(type=ScopeEnum.Loop, name='', dim=self.Scopes[-1].dim, tempvar=0))
+                self.Scopes[-1].dim = ifSmtind
+                self.Scopes[-1].tempvar = self.Scopes[-2].tempvar
+                if type(node.ifSmt).__name__ == "ASTBlockSmtNode":
+                    for smt in node.ifSmt.Smt:
+                        self.llvm(smt)
+                else:
+                    self.llvm(node.ifSmt)
+                self.generatejump(root[self.Scopes[-1].dim], endSmt)
+                self.Scopes[-2].dim = self.Scopes[-1].dim
+                self.Scopes[-2].tempvar = self.Scopes[-1].tempvar
+                self.Scopes.pop()
+                self.NameSpace.pop()
+            if elseSmtind != -1:
+                self.Scopes.append(Scope(type=ScopeEnum.Loop, name='', dim=self.Scopes[-1].dim, tempvar=self.Scopes[-1].tempvar))
+                self.NameSpace.append(Scope(type=ScopeEnum.Loop, name='', dim=self.Scopes[-1].dim, tempvar=0))
+                self.Scopes[-1].dim = elseSmtind
+                self.Scopes[-1].tempvar = self.Scopes[-2].tempvar
+                if type(node.elseSmt).__name__ == "ASTBlockSmtNode":
+                    for smt in node.elseSmt.Smt:
+                        self.llvm(smt)
+                else:
+                    self.llvm(node.elseSmt)
+                self.generatejump(root[self.Scopes[-1].dim], endSmt)
+                self.Scopes[-2].dim = self.Scopes[-1].dim
+                self.Scopes[-2].tempvar = self.Scopes[-1].tempvar
+                self.Scopes.pop()
+                self.NameSpace.pop()
+            self.Scopes[-1].dim = endSmtind
+
+    def llvmASTAssignExprNode(self, node):
+        where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
+        if type(node.rhs).__name__ != "ASTConstExprContextNode":
+            newvar = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1;
+            self.generateload(where, self.typeget(node.lhs)[0], node.rhs, newvar)
+        else:
+            newvar = str(int(node.rhs.value))
+        if type(node.lhs).__name__ == "ASTIdentifierExprNode":
+            self.generatestore(where, self.typeget(node.lhs)[0], node.lhs.id, newvar)
+        else:
+            raise Exception("TODO")
+
+    def llvmASTLoopForNode(self, node):
+        self.Scopes.append(Scope(type=ScopeEnum.Loop, name='', dim=self.Scopes[-1].dim, tempvar=self.Scopes[-1].tempvar))
+        self.NameSpace.append(Scope(type=ScopeEnum.Loop, name='', dim=self.Scopes[-1].dim, tempvar=0))
+        self.Scopes[-1].dim = self.Scopes[-2].dim
+        self.Scopes[-1].tempvar = self.Scopes[-2].tempvar
+        self.llvm(node.initExpr)
+        root = self.llvmfunc[self.getfuncname()][2]
+        forcondind = len(root)
+        forcond = f'for.cond.{len(root)}'
+        root.append([f'for.cond.{len(root)}:\n'])
+        forbodyind = len(root)
+        forbody = f'for.body.{len(root)}'
+        root.append([f'for.body.{len(root)}:\n'])
+        forincind = len(root)
+        forinc = f'for.inc.{len(root)}'
+        root.append([f'for.inc.{len(root)}:\n'])
+        forendind = len(root)
+        forend = f'for.end.{len(root)}'
+        root.append([f'for.end.{len(root)}:\n'])
+        self.generatejump(root[self.Scopes[-1].dim], forcond)
+        self.Scopes[-1].dim = forcondind
+        self.generateloopcondition(root[self.Scopes[-1].dim], node.endCondition, forbody, forend)
+        self.Scopes[-1].dim = forbodyind
+        self.generateloopbody(root[self.Scopes[-1].dim], node.Smt, forinc)
+        self.Scopes[-1].dim = forincind
+        self.generateloopinc(root[self.Scopes[-1].dim], node.step, forcond)
+        self.Scopes[-1].dim = forendind
+        self.Scopes[-2].dim = self.Scopes[-1].dim
+        self.Scopes[-2].tempvar = self.Scopes[-1].tempvar
+        self.Scopes.pop()
+        self.NameSpace.pop()
+
+    def llvmASTLoopWhileNode(self, node):
+        root = self.llvmfunc[self.getfuncname()][2]
+        if type(node.Condition).__name__ == "ASTConstExprContextNode":
+            if node.Condition.value:
+                bodySmtind = len(root)
+                bodySmt = f"whilebodySmt.{len(root)}"
+                root.append([f'whilebodySmt.{len(root)}:\n'])
+                endSmtind = len(root)
+                endSmt = f"whileendSmt.{len(root)}"
+                root.append([f'whileendSmt.{len(root)}:\n'])
+                self.generatejump(root[self.Scopes[-1].dim], bodySmt)
+                self.Scopes.append(Scope(type=ScopeEnum.Loop, name='', dim=self.Scopes[-1].dim, tempvar=self.Scopes[-1].tempvar))
+                self.NameSpace.append(Scope(type=ScopeEnum.Loop, name='', dim=self.Scopes[-1].dim, tempvar=0))
+                self.Scopes[-1].dim = bodySmtind
+                self.Scopes[-1].tempvar = self.Scopes[-2].tempvar
+                if type(node.Smt).__name__ == "ASTBlockSmtNode":
+                    for smt in node.Smt.Smt:
+                        self.llvm(smt)
+                else:
+                    self.llvm(node.Smt)
+                self.generatejump(root[self.Scopes[-1].dim], bodySmt)
+        else:
+            condSmtind = len(root)
+            condSmt = f"whilecondSmt.{len(root)}"
+            root.append([f'whilecondSmt.{len(root)}:\n'])
+            bodySmtind = len(root)
+            bodySmt = f"whilebodySmt.{len(root)}"
+            root.append([f'whilebodySmt.{len(root)}:\n'])
+            endSmtind = len(root)
+            endSmt = f"whileendSmt.{len(root)}"
+            root.append([f'whileendSmt.{len(root)}:\n'])
+            self.generatejump(root[self.Scopes[-1].dim], condSmt)
+            self.Scopes.append(Scope(type=ScopeEnum.Loop, name='', dim=self.Scopes[-1].dim, tempvar=self.Scopes[-1].tempvar))
+            self.NameSpace.append(Scope(type=ScopeEnum.Loop, name='', dim=self.Scopes[-1].dim, tempvar=0))
+            self.Scopes[-1].dim = condSmtind
+            self.Scopes[-1].tempvar = self.Scopes[-2].tempvar
+            newvar = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            self.generateload(root[self.Scopes[-1].dim], typeclass(t=typeEnum.BOOL), node.Condition, newvar)
+            self.generatebranch(root[self.Scopes[-1].dim], newvar, bodySmt, endSmt)
+            self.Scopes[-1].dim = bodySmtind
+            if type(node.Smt).__name__ == "ASTBlockSmtNode":
+                for smt in node.Smt.Smt:
+                    self.llvm(smt)
+            else:
+                self.llvm(node.Smt)
+            self.generatejump(root[self.Scopes[-1].dim], condSmt)
+            self.Scopes[-2].dim = endSmtind
+            self.Scopes[-2].tempvar = self.Scopes[-1].tempvar
+            self.Scopes.pop()
+            self.NameSpace.pop()
+
+    def generatejump(self, where, label):
+        where.append(f'br label %{label}\n')
+
+    def generateloopcondition(self, where, conditionnode, bodylabel, endlabel):
+        newvar = f"%._{self.Scopes[-1].tempvar}"
+        self.Scopes[-1].tempvar += 1
+        self.generateload(where, typeclass(t=typeEnum.BOOL), conditionnode, newvar)
+        self.generatebranch(where, newvar, bodylabel, endlabel)
+
+    def generateloopbody(self, where, smtnode, tolabel):
+        for smt in smtnode.Smt:
+            self.llvm(smt)
+        self.generatejump(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], tolabel)
+
+    def generateloopinc(self, where, stepnode, tolabel):
+        self.llvm(stepnode)
+        self.generatejump(where, tolabel)
+
+    def generatebranch(self, where, var, label1, label2):
+        where.append(f"br i1 {var}, label %{label1}, label %{label2}\n")
+
     def generateload(self, where, typetodo, vars, target):
         if type(vars).__name__ == 'ASTIdentifierExprNode':
             where.append(f"{target} = load {self.llvmtypeclass(typetodo)}, ptr {self.getname(vars.id)}\n")
@@ -1876,7 +2140,9 @@ class ASTBuilder:
                 newvar = self.generategetelementptr(where, self.typeget(vars.body)[0], self.getname(vars.body.id), vars.id)
                 self.generateload(where, self.gettype(newvar), newvar, target)
         elif type(vars).__name__ == "ASTBinaryExprNode":
-            if typetodo.type == typeEnum.INT:
+            if typetodo.dim > 0:
+                raise Exception("TODO")
+            elif typetodo.type == typeEnum.INT:
                 if type(vars.lhs).__name__ == "ASTConstExprContextNode":
                     lhsnewvar = str(vars.lhs.value)
                 else:
@@ -1894,6 +2160,33 @@ class ASTBuilder:
                     self.Scopes[-1].VarsBank[rhsnewvar] = typetodo
                     self.generateload(where, typetodo, vars.rhs, rhsnewvar)
                 self.generateFuncCall(where, None, vars.op, [lhsnewvar, rhsnewvar], target)
+            elif typetodo.type == typeEnum.BOOL:
+                if type(vars.lhs).__name__ == "ASTConstExprContextNode":
+                    lhsnewvar = str(vars.lhs.value)
+                else:
+                    lhsnewvar = f"%._{self.Scopes[-1].tempvar}"
+                    self.Scopes[-1].tempvar += 1
+                    self.NameSpace[-1].VarsBank[lhsnewvar] = lhsnewvar
+                    self.Scopes[-1].VarsBank[lhsnewvar] = typetodo
+                    self.generateload(where, self.typeget(vars.lhs)[0], vars.lhs, lhsnewvar)
+                if type(vars.rhs).__name__ == "ASTConstExprContextNode":
+                    rhsnewvar = str(vars.rhs.value)
+                else:
+                    rhsnewvar = f"%._{self.Scopes[-1].tempvar}"
+                    self.Scopes[-1].tempvar += 1
+                    self.NameSpace[-1].VarsBank[rhsnewvar] = rhsnewvar
+                    self.Scopes[-1].VarsBank[rhsnewvar] = typetodo
+                    self.generateload(where, self.typeget(vars.rhs)[0], vars.rhs, rhsnewvar)
+                lhstype = self.typeget(vars.lhs)[0]
+                rhstype = self.typeget(vars.rhs)[0]
+                if lhstype.dim > 0 or rhstype.dim > 0:
+                    raise Exception("TODO")
+                elif (lhstype.type == typeEnum.INT) and (rhstype.type == typeEnum.INT):
+                    self.generateFuncCall(where, None, vars.op, ['i32', lhsnewvar, rhsnewvar], target)
+                else:
+                    raise Exception("TODO")
+            else:
+                raise Exception("TODO")
         elif type(vars).__name__ == "ASTUnaryExprNode":
             if vars.op == '+':
                 self.generateload(where, typetodo, vars.body, target)
@@ -1952,6 +2245,8 @@ class ASTBuilder:
     def generateFuncCall(self, where, retType, funcname, arglist, retwhere):
         if funcname in self.symbol:
             where.append(f"{retwhere} = {self.symbol[funcname]} i32 {arglist[0]}, {arglist[1]}\n")
+        elif funcname in self.logic:
+            where.append(f"{retwhere} = icmp {self.logic[funcname]} {arglist[0]} {arglist[1]}, {arglist[2]}\n")
         elif funcname == '!':
             where.append(f"{retwhere} = xor i1 {arglist[0]}, {arglist[1]}\n")
         elif retType == typeclass(t=typeEnum.VOID):
@@ -1976,6 +2271,8 @@ class ASTBuilder:
     def generateret(self, where, typetodo, retNode):
         if typetodo == typeclass(t=typeEnum.VOID):
             where.append(f"ret void\n")
+        else:
+            where.append(f"ret {self.llvmtypeclass(typetodo)} {retNode}\n")
 
     def generatealloca(self, where, typetodo, target):
         if typetodo.dim > 0:
