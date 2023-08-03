@@ -1883,6 +1883,22 @@ class ASTBuilder:
         else:
             raise Exception("TODO")
 
+    def llvmASTPrefixUpdateExprNode(self, node):
+        where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
+        if type(node.body).__name__ == "ASTIdentifierExprNode":
+            newvar = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            self.generateload(where, typeclass(t=typeEnum.INT), node.body, newvar)
+            newvars = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            if node.op == '++':
+                self.generateFuncCall(where, None, '+', [newvar, '1'], newvars)
+            else:
+                self.generateFuncCall(where, None, '-', [newvar, '1'], newvars)
+            self.generatestore(where, typeclass(t=typeEnum.INT), node.body.id, newvars)
+        else:
+            raise Exception("TODO")
+
     def llvmASTControlNode(self, node):
         where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
         if node.cmd == 'Return':
