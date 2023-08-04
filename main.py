@@ -1219,8 +1219,13 @@ class ASTBuilder:
         if conditioncheck and (conditiontype == typeclass(t=typeEnum.BOOL)):
             lhstype, _, lhscheck = self.typeget(node.lhs)
             rhstype, _, rhscheck = self.typeget(node.rhs)
-            if lhscheck and rhscheck and (lhstype == rhstype):
-                return lhstype, False, True
+            if lhscheck and rhscheck:
+                if (lhstype == rhstype):
+                    return lhstype, False, True
+                if lhstype.type == typeEnum.NULL:
+                    return rhstype, False, True
+                if rhstype.type == typeEnum.NULL:
+                    return lhstype, False, True
         return None, False, False
 
     def checkfuncASTTriExprNode(self, funcnode, smt):
