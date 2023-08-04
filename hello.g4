@@ -44,7 +44,7 @@ expression
     |   lhs=expression op='&&' rhs=expression                                                                           # BinaryExpr
     |   lhs=expression op='||' rhs=expression                                                                           # BinaryExpr
     |   <assoc=right> lhs=lhsexpression '=' rhs=expression                                                              # AssignExpr
-    |   con=expression '?' lhs=expression ':' rhs=expression                                                            # TriExpr
+    |   <assoc=right> con=expression '?' lhs=expression ':' rhs=expression                                                            # TriExpr
     ;
 
 newexpression   :   NEW newtypename ('('')')?   ;
