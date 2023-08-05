@@ -599,7 +599,7 @@ class ASTBuilder:
                         '__newBoolArray': ['i32'],
                         '__newPtrArray': ['i32'],
                         '__array.size': ['ptr'], }
-        self.globalvars = []
+        self.globalvars = ['@.true = global i8 1\n', '@.false = global i8 0\n']
         self.llvmclass = {}
         self.symbol = {'+': 'add', '-': 'sub', '*': 'mul', '/': 'sdiv', '%': 'srem', '<<': 'shl', '>>': 'ashr', '&': 'and', '^': 'xor',
                        '|': 'or', }
@@ -890,13 +890,6 @@ class ASTBuilder:
         for child in node.children:
             if type(child).__name__ == 'ASTVariabledeclarationNode':
                 continue
-                # for ids in child.init:
-                #     typecheck = self.checktype(child.type, ids.expr)
-                #     repeatcheck = self.checkrepeat(ids.id)
-                #     if typecheck and repeatcheck != 0:
-                #         self.Scopes[0].VarsBank[ids.id] = child.type
-                #     else:
-                #         return False
             elif type(child).__name__ == 'ASTFunctiondeclarationContextNode':
                 if (self.checkrepeat(child.id) == -1) and (child.id not in self.FuncBank) and (
                         child.id not in self.ClassBank):
@@ -1543,7 +1536,7 @@ declare ptr @__newBoolArray(i32)
         elif typeclass.type == typeEnum.INT:
             return 'i32'
         elif typeclass.type == typeEnum.BOOL:
-            return 'i1'
+            return 'i8'
         elif typeclass.type == typeEnum.VOID:
             return 'void'
         elif typeclass.type == typeEnum.STRING:
@@ -1576,6 +1569,24 @@ declare ptr @__newBoolArray(i32)
     def llvmInit(self, typetodo, init):
         name = 'llvmInit' + type(init.expr).__name__
         self.__getattribute__(name)(typetodo, init)
+
+    def llvmInitASTArrayExprNode(self, typetodo, init):
+        if self.Scopes[-1].type == ScopeEnum.Global:
+            raise Exception("TODO")
+        else:
+            where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
+            varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
+            self.NameSpace[-1].VarsBank[init.id] = varname
+            self.NameSpace[-1].VarsBank[varname] = varname
+            self.Scopes[-1].VarsBank[init.id] = typetodo
+            self.Scopes[-1].VarsBank[varname] = typetodo
+            self.generatealloca(where, typetodo, varname)
+            newvar = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            self.Scopes[-1].VarsBank[newvar] = typetodo
+            self.NameSpace[-1].VarsBank[newvar] = newvar
+            self.generateload(where, typetodo, init.expr, newvar)
+            self.generatestore(where, typetodo, varname, newvar)
 
     def llvmInitASTConstExprContextNode(self, typetodo, init):
         if self.Scopes[-1].type == ScopeEnum.Global:
@@ -1631,6 +1642,27 @@ declare ptr @__newBoolArray(i32)
                 self.generateFuncCall(where, None, '-', [newvar, '1'], newvars)
             self.generatestore(where, typeclass(t=typeEnum.INT), bodyptr, newvars)
             return bodyptr
+        elif type(node).__name__ == 'ASTArrayExprNode':
+            if type(node.ind).__name__ == "ASTConstExprContextNode":
+                numvar = str(int(node.ind.value))
+            else:
+                numvar = f"%._{self.Scopes[-1].tempvar}"
+                self.Scopes[-1].tempvar += 1
+                self.NameSpace[-1].VarsBank[numvar] = numvar
+                self.Scopes[-1].VarsBank[numvar] = typeclass(t=typeEnum.INT)
+                self.generateload(where, typeclass(t=typeEnum.INT), node.ind, numvar)
+            bodyptr = self.getelementptr(node.body)
+            newvar = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            self.NameSpace[-1].VarsBank[newvar] = newvar
+            self.Scopes[-1].VarsBank[newvar] = self.typeget(node.body)[0]
+            self.generateload(where, self.typeget(node.body)[0], bodyptr, newvar)
+            newvars = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            self.NameSpace[-1].VarsBank[newvars] = newvars
+            self.Scopes[-1].VarsBank[newvars] = self.typeget(node)[0]
+            self.generategetelementptr(where, self.typeget(node.body)[0], newvar, numvar, newvars)
+            return newvars
         else:
             raise Exception("TODO")
 
@@ -1875,12 +1907,12 @@ declare ptr @__newBoolArray(i32)
                 self.Scopes[-1].VarsBank[xunhuanbianliang] = typeclass(t=typeEnum.INT)
                 self.generatealloca(root[self.Scopes[-1].dim], typeclass(t=typeEnum.INT), xunhuanbianliang)
                 self.generatestore(root[self.Scopes[-1].dim], typeclass(t=typeEnum.INT), xunhuanbianliang, '0')
-                nowtype.dim += 1
                 allptr = f"%._{self.Scopes[-1].tempvar}"
                 self.Scopes[-1].tempvar += 1
                 self.NameSpace[-1].VarsBank[allptr] = allptr
                 self.Scopes[-1].VarsBank[allptr] = nowtype
-                self.generatealloca(root[self.Scopes[-1].dim], nowtype, allptr)
+                self.generateload(root[self.Scopes[-1].dim], nowtype, target, allptr)
+                nowtype.dim += 1
                 forcondind = len(root)
                 forcond = f'for.cond.{len(root)}'
                 root.append([f'for.cond.{len(root)}:\n'])
@@ -1916,9 +1948,8 @@ declare ptr @__newBoolArray(i32)
                 self.Scopes[-1].tempvar += 1
                 self.NameSpace[-1].VarsBank[tempptr] = tempptr
                 self.Scopes[-1].VarsBank[tempptr] = nowtype
-                self.generategetelementptr(root[self.Scopes[-1].dim], self.gettype(target), target, loadxunhuanbianlaing_1,tempptr)
-                self.generatestore(root[self.Scopes[-1].dim], self.gettype(tempptr), allptr, tempptr)
-                self.generatenewarray(root, dims, nowdim, targetdim, targettype, allptr)
+                self.generategetelementptr(root[self.Scopes[-1].dim], self.gettype(allptr), allptr, loadxunhuanbianlaing_1, tempptr)
+                self.generatenewarray(root, dims, nowdim, targetdim, targettype, tempptr)
                 self.generatejump(root[self.Scopes[-1].dim], forinc)
                 self.Scopes[-1].dim = forincind
                 loadxunhuanbianlaing_1 = f"%._{self.Scopes[-1].tempvar}"
@@ -2099,6 +2130,8 @@ declare ptr @__newBoolArray(i32)
                 self.generateret(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.VOID), ASTEmptyNode())
                 self.Scopes.pop()
                 self.NameSpace.pop()
+            else:
+                raise Exception("TODO")
             # 短路求值TODO
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
@@ -2129,6 +2162,15 @@ declare ptr @__newBoolArray(i32)
                 self.Scopes[-1].tempvar += 1
                 self.generateFuncCall(where, None, init.expr.op, [lhsnewvar, rhsnewvar], var)
                 self.generatestore(where, typetodo, init.id, var)
+            elif typetodo.type == typeEnum.BOOL:
+                var = f"%._{self.Scopes[-1].tempvar}"
+                self.Scopes[-1].tempvar += 1
+                self.Scopes[-1].VarsBank[var] = typetodo
+                self.NameSpace[-1].VarsBank[var] = var
+                self.generateload(where, typetodo, init.expr, var)
+                self.generatestore(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], typetodo, init.id, var)
+            else:
+                raise Exception("TODO")
 
     def llvmInitASTUnaryExprNode(self, typetodo, init):
         if self.Scopes[-1].type == ScopeEnum.Global:
@@ -2302,6 +2344,8 @@ declare ptr @__newBoolArray(i32)
         else:
             newvar = f"%._{self.Scopes[-1].tempvar}"
             self.Scopes[-1].tempvar += 1
+            self.NameSpace[-1].VarsBank[newvar] = newvar
+            self.Scopes[-1].VarsBank[newvar] = typeclass(t=typeEnum.BOOL)
             self.generateload(root[self.Scopes[-1].dim], typeclass(t=typeEnum.BOOL), node.condition, newvar)
             if node.ifSmt != ASTEmptyNode():
                 ifSmtind = len(root)
@@ -2361,6 +2405,8 @@ declare ptr @__newBoolArray(i32)
         if type(node.rhs).__name__ != "ASTConstExprContextNode":
             newvar = f"%._{self.Scopes[-1].tempvar}"
             self.Scopes[-1].tempvar += 1
+            self.NameSpace[-1].VarsBank[newvar] = newvar
+            self.Scopes[-1].VarsBank[newvar] = self.typeget(node.rhs)[0]
             self.generateload(where, self.typeget(node.rhs)[0], node.rhs, newvar)
         else:
             newvar = str(int(node.rhs.value))
@@ -2470,7 +2516,10 @@ declare ptr @__newBoolArray(i32)
         self.generatejump(where, tolabel)
 
     def generatebranch(self, where, var, label1, label2):
-        where.append(f"br i1 {var}, label %{label1}, label %{label2}\n")
+        newvar = f"%._{self.Scopes[-1].tempvar}"
+        self.Scopes[-1].tempvar += 1
+        where.append(f"{newvar} = trunc i8 {var} to i1\n")
+        where.append(f"br i1 {newvar}, label %{label1}, label %{label2}\n")
 
     def generateload(self, where, typetodo, vars, target):
         if type(vars).__name__ == 'ASTIdentifierExprNode':
@@ -2484,10 +2533,18 @@ declare ptr @__newBoolArray(i32)
                 self.NameSpace[-1].VarsBank[newvar] = newvar
                 self.Scopes[-1].VarsBank[newvar] = self.typeget(vars.body)[0]
                 self.generateload(where, self.typeget(vars.body)[0], vars.body, newvar)
-                newvar = self.generategetelementptr(where, self.Scopes[-1].VarsBank[newvar], newvar, vars.id)
-                self.generateload(where, self.gettype(newvar), newvar, target)
+                newvars = f"%._{self.Scopes[-1].tempvar}"
+                self.Scopes[-1].tempvar += 1
+                self.NameSpace[-1].VarsBank[newvars] = newvars
+                self.Scopes[-1].VarsBank[newvars] = self.typeget(vars)[0]
+                self.generategetelementptr(where, self.Scopes[-1].VarsBank[newvar], newvar, vars.id, newvars)
+                self.generateload(where, self.gettype(newvar), newvars, target)
             else:
-                newvar = self.generategetelementptr(where, self.typeget(vars.body)[0], self.getname(vars.body.id), vars.id)
+                newvar = f"%._{self.Scopes[-1].tempvar}"
+                self.Scopes[-1].tempvar += 1
+                self.NameSpace[-1].VarsBank[newvar] = newvar
+                self.Scopes[-1].VarsBank[newvar] = self.typeget(vars.body)[0]
+                self.generategetelementptr(where, self.typeget(vars.body)[0], self.getname(vars.body.id), vars.id, newvar)
                 self.generateload(where, self.gettype(newvar), newvar, target)
         elif type(vars).__name__ == "ASTBinaryExprNode":
             if typetodo.dim > 0:
@@ -2511,28 +2568,97 @@ declare ptr @__newBoolArray(i32)
                     self.generateload(where, typetodo, vars.rhs, rhsnewvar)
                 self.generateFuncCall(where, None, vars.op, [lhsnewvar, rhsnewvar], target)
             elif typetodo.type == typeEnum.BOOL:
-                if type(vars.lhs).__name__ == "ASTConstExprContextNode":
-                    lhsnewvar = str(vars.lhs.value)
-                else:
-                    lhsnewvar = f"%._{self.Scopes[-1].tempvar}"
-                    self.Scopes[-1].tempvar += 1
-                    self.NameSpace[-1].VarsBank[lhsnewvar] = lhsnewvar
-                    self.Scopes[-1].VarsBank[lhsnewvar] = typetodo
-                    self.generateload(where, self.typeget(vars.lhs)[0], vars.lhs, lhsnewvar)
-                if type(vars.rhs).__name__ == "ASTConstExprContextNode":
-                    rhsnewvar = str(vars.rhs.value)
-                else:
-                    rhsnewvar = f"%._{self.Scopes[-1].tempvar}"
-                    self.Scopes[-1].tempvar += 1
-                    self.NameSpace[-1].VarsBank[rhsnewvar] = rhsnewvar
-                    self.Scopes[-1].VarsBank[rhsnewvar] = typetodo
-                    self.generateload(where, self.typeget(vars.rhs)[0], vars.rhs, rhsnewvar)
                 lhstype = self.typeget(vars.lhs)[0]
                 rhstype = self.typeget(vars.rhs)[0]
                 if lhstype.dim > 0 or rhstype.dim > 0:
                     raise Exception("TODO")
                 elif (lhstype.type == typeEnum.INT) and (rhstype.type == typeEnum.INT):
+                    if type(vars.lhs).__name__ == "ASTConstExprContextNode":
+                        lhsnewvar = str(vars.lhs.value)
+                    else:
+                        lhsnewvar = f"%._{self.Scopes[-1].tempvar}"
+                        self.Scopes[-1].tempvar += 1
+                        self.NameSpace[-1].VarsBank[lhsnewvar] = lhsnewvar
+                        self.Scopes[-1].VarsBank[lhsnewvar] = typetodo
+                        self.generateload(where, self.typeget(vars.lhs)[0], vars.lhs, lhsnewvar)
+                    if type(vars.rhs).__name__ == "ASTConstExprContextNode":
+                        rhsnewvar = str(vars.rhs.value)
+                    else:
+                        rhsnewvar = f"%._{self.Scopes[-1].tempvar}"
+                        self.Scopes[-1].tempvar += 1
+                        self.NameSpace[-1].VarsBank[rhsnewvar] = rhsnewvar
+                        self.Scopes[-1].VarsBank[rhsnewvar] = typetodo
+                        self.generateload(where, self.typeget(vars.rhs)[0], vars.rhs, rhsnewvar)
                     self.generateFuncCall(where, None, vars.op, ['i32', lhsnewvar, rhsnewvar], target)
+                elif (lhstype.type == typeEnum.BOOL) and (rhstype.type == typeEnum.BOOL):
+                    if type(vars.lhs).__name__ == "ASTConstExprContextNode":
+                        lhsnewvar = vars.lhs.value
+                        if vars.op == '&&':
+                            if lhsnewvar:
+                                self.generateload(where, typeclass(t=typeEnum.BOOL), vars.rhs, target)
+                            else:
+                                self.generateload(where, typetodo, '@.false', target)
+                        else:
+                            if lhsnewvar:
+                                self.generateload(where, typetodo, '@.true', target)
+                            else:
+                                self.generateload(where, typeclass(t=typeEnum.BOOL), vars.rhs, target)
+                    else:
+                        if vars.op == '&&':
+                            symbol = 'and'
+                        else:
+                            symbol = 'or'
+                        lhsnewvar = f"%._{self.Scopes[-1].tempvar}"
+                        self.Scopes[-1].tempvar += 1
+                        self.NameSpace[-1].VarsBank[lhsnewvar] = lhsnewvar
+                        self.Scopes[-1].VarsBank[lhsnewvar] = typeclass(t=typeEnum.BOOL)
+                        self.generateload(where, self.typeget(vars.lhs)[0], vars.lhs, lhsnewvar)
+                        where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
+                        nowlabel = where[0][:-2]
+                        rhsind = len(self.llvmfunc[self.getfuncname()][2])
+                        rhslabel = f"{symbol}_rhs_{len(self.llvmfunc[self.getfuncname()][2])}"
+                        self.llvmfunc[self.getfuncname()][2].append([f"{rhslabel}:\n"])
+                        endind = len(self.llvmfunc[self.getfuncname()][2])
+                        endlabel = f"{symbol}_end_{len(self.llvmfunc[self.getfuncname()][2])}"
+                        self.llvmfunc[self.getfuncname()][2].append([f"{endlabel}:\n"])
+                        if vars.op == '&&':
+                            self.generatebranch(where, lhsnewvar, rhslabel, endlabel)
+                            self.Scopes[-1].dim = rhsind
+                            newvar = f"%._{self.Scopes[-1].tempvar}"
+                            self.Scopes[-1].tempvar += 1
+                            self.NameSpace[-1].VarsBank[newvar] = newvar
+                            self.Scopes[-1].VarsBank[newvar] = typeclass(t=typeEnum.BOOL)
+                            self.generateload(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], typeclass(t=typeEnum.BOOL), vars.rhs, newvar)
+                            tobool = f"%._{self.Scopes[-1].tempvar}"
+                            self.Scopes[-1].tempvar += 1
+                            self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append(f"{tobool} = trunc i8 {newvar} to i1\n")
+                            self.generatejump(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], endlabel)
+                            rhsendlabel = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim][0][:-2]
+                            self.Scopes[-1].dim = endind
+                            newvar = f"%._{self.Scopes[-1].tempvar}"
+                            self.Scopes[-1].tempvar += 1
+                            self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append(
+                                f"{newvar} = phi i1 [ false, %{nowlabel} ], [ {tobool}, %{rhsendlabel}]\n")
+                            self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append(f"{target} = zext i1 {newvar} to i8\n")
+                        else:
+                            self.generatebranch(where, lhsnewvar, endlabel, rhslabel)
+                            self.Scopes[-1].dim = rhsind
+                            newvar = f"%._{self.Scopes[-1].tempvar}"
+                            self.Scopes[-1].tempvar += 1
+                            self.NameSpace[-1].VarsBank[newvar] = newvar
+                            self.Scopes[-1].VarsBank[newvar] = typeclass(t=typeEnum.BOOL)
+                            self.generateload(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], typeclass(t=typeEnum.BOOL), vars.rhs, newvar)
+                            tobool = f"%._{self.Scopes[-1].tempvar}"
+                            self.Scopes[-1].tempvar += 1
+                            self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append(f"{tobool} = trunc i8 {newvar} to i1\n")
+                            self.generatejump(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], endlabel)
+                            rhsendlabel = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim][0][:-2]
+                            self.Scopes[-1].dim = endind
+                            newvar = f"%._{self.Scopes[-1].tempvar}"
+                            self.Scopes[-1].tempvar += 1
+                            self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append(
+                                f"{newvar} = phi i1 [ true, %{nowlabel} ], [ {tobool}, %{rhsendlabel}]\n")
+                            self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append(f"{target} = zext i1 {newvar} to i8\n")
                 else:
                     raise Exception("TODO")
             else:
@@ -2554,7 +2680,7 @@ declare ptr @__newBoolArray(i32)
                 newvar = f"%._{self.Scopes[-1].tempvar}"
                 self.Scopes[-1].tempvar += 1
                 self.generateload(where, typetodo, vars.body, newvar)
-                self.generateFuncCall(where, None, '!', [newvar, 'true'], target)
+                self.generateFuncCall(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], None, '!', [newvar, 'true'], target)
         elif type(vars).__name__ == "ASTPrefixUpdateExprNode":
             bodyptr = self.getelementptr(vars.body)
             newvar = f"%._{self.Scopes[-1].tempvar}"
@@ -2575,6 +2701,17 @@ declare ptr @__newBoolArray(i32)
             else:
                 self.generateFuncCall(where, None, '-', [target, '1'], newvar)
             self.generatestore(where, typeclass(t=typeEnum.INT), bodyptr, newvar)
+        elif type(vars).__name__ == 'ASTNewArrayContextNode':
+            newvar = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            self.Scopes[-1].VarsBank[newvar] = typetodo
+            self.NameSpace[-1].VarsBank[newvar] = newvar
+            self.generatealloca(where, typetodo, newvar)
+            self.generatenewarray(self.llvmfunc[self.getfuncname()][2], vars.dims, 0, self.typeget(vars)[0].dim, self.typeget(vars)[0], newvar)
+            self.generateload(where, typetodo, newvar, target)
+        elif type(vars).__name__ == 'ASTArrayExprNode':
+            bodyptr = self.getelementptr(vars)
+            self.generateload(where, typetodo, bodyptr, target)
         else:
             raise Exception("TODO")
 
@@ -2582,11 +2719,11 @@ declare ptr @__newBoolArray(i32)
         if typetodo.dim > 0:
             if typetodo.dim == 0:
                 if typetodo.type == typeEnum.INT:
-                    where.append(f"{newvar} = getelementptr i32, ptr {target}, i32 {self.getname(id)}\n")
+                    where.append(f"{newvar} = getelementptr i32, ptr {target}, i32 {id}\n")
                 else:
                     raise Exception("TODO")
             else:
-                where.append(f"{newvar} = getelementptr ptr, ptr {target}, i32 {self.getname(id)}\n")
+                where.append(f"{newvar} = getelementptr ptr, ptr {target}, i32 {id}\n")
         else:
             raise Exception("TODO")
 
@@ -2612,9 +2749,18 @@ declare ptr @__newBoolArray(i32)
         if funcname in self.symbol:
             where.append(f"{retwhere} = {self.symbol[funcname]} i32 {arglist[0]}, {arglist[1]}\n")
         elif funcname in self.logic:
-            where.append(f"{retwhere} = icmp {self.logic[funcname]} {arglist[0]} {arglist[1]}, {arglist[2]}\n")
+            frombool = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            where.append(f"{frombool} = icmp {self.logic[funcname]} {arglist[0]} {arglist[1]}, {arglist[2]}\n")
+            where.append(f"{retwhere} = zext i1 {frombool} to i8\n")
         elif funcname == '!':
-            where.append(f"{retwhere} = xor i1 {arglist[0]}, {arglist[1]}\n")
+            tobool = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            frombool = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            where.append(f"{tobool} = trunc i8 {arglist[0]} to i1\n")
+            where.append(f"{frombool} = xor i1 {tobool}, {arglist[1]}\n")
+            where.append(f"{retwhere} = zext i1 {frombool} to i8\n")
         elif retType.dim > 0:
             res = f"{retwhere} = call ptr @{funcname}("
             for i in range(len(arglist)):
@@ -2665,6 +2811,8 @@ declare ptr @__newBoolArray(i32)
             where.append(f"{target} = alloca i32\n")
         elif typetodo.type == typeEnum.STRING:
             where.append(f"{target} = alloca ptr\n")
+        elif typetodo.type == typeEnum.BOOL:
+            where.append(f"{target} = alloca i8\n")
         else:
             raise Exception("TODO")
 
