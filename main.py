@@ -1,6 +1,5 @@
 import os
 import time
-
 from antlr4 import *
 from py_parser.helloLexer import helloLexer
 from py_parser.helloParser import helloParser
@@ -725,7 +724,7 @@ class ASTBuilder:
 
     def buildBinaryExprContext(self, node):
         res = ASTBinaryExprNode(op=node.op.text, lhs=self.build(node.lhs), rhs=self.build(node.rhs))
-        if type(res.rhs).__name__ == "ASTConstExprContextNode":
+        if type(res.rhs).__name__ == "ASTConstExprContextNode" and type(res.lhs).__name__ != "ASTConstExprContextNode" and (res.op in ['+','*','&','|','^','&&','||']):
             lhs = res.lhs
             rhs = res.rhs
             res.lhs = rhs
