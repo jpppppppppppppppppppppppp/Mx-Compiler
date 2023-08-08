@@ -2556,8 +2556,6 @@ declare ptr @malloc(i32)
             self.generateret(self.llvmfunc[funcname][2][self.Scopes[-1].dim], typeclass(t=typeEnum.VOID), ASTEmptyNode())
             self.Scopes.pop()
             self.NameSpace.pop()
-
-        # 短路求值TODO
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
@@ -2680,6 +2678,48 @@ declare ptr @malloc(i32)
         else:
             self.generateFuncCall(where, None, '-', [newvar, '1'], newvars)
         self.generatestore(where, typeclass(t=typeEnum.INT), bodytpr, newvars)
+
+    def llvmASTTriExprNode(self, node):
+        convar = f"%._{self.Scopes[-1].tempvar}"
+        self.Scopes[-1].tempvar += 1
+        self.NameSpace[-1].VarsBank[convar] = convar
+        self.Scopes[-1].VarsBank[convar] = typeclass(t=typeEnum.BOOL)
+        self.generateload(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], typeclass(t=typeEnum.BOOL), node.condition, convar)
+        where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
+        nowlabel = where[0][:-2]
+        trueind = len(self.llvmfunc[self.getfuncname()][2])
+        truelabel = f"tri_true_{len(self.llvmfunc[self.getfuncname()][2])}"
+        self.llvmfunc[self.getfuncname()][2].append([f"{truelabel}:\n"])
+        falseind = len(self.llvmfunc[self.getfuncname()][2])
+        falselabel = f"tri_false_{len(self.llvmfunc[self.getfuncname()][2])}"
+        self.llvmfunc[self.getfuncname()][2].append([f"{falselabel}:\n"])
+        endind = len(self.llvmfunc[self.getfuncname()][2])
+        endlabel = f"tri_end_{len(self.llvmfunc[self.getfuncname()][2])}"
+        self.llvmfunc[self.getfuncname()][2].append([f"{endlabel}:\n"])
+        self.generatebranch(where, convar, truelabel, falselabel)
+        self.Scopes[-1].dim = trueind
+        if type(node.lhs).__name__ == "ASTConstExprContextNode":
+            pass
+        else:
+            lhsnewvar = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            self.NameSpace[-1].VarsBank[lhsnewvar] = lhsnewvar
+            self.Scopes[-1].VarsBank[lhsnewvar] = self.typeget(node.lhs)[0]
+            self.generateload(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], self.typeget(node.lhs)[0], node.lhs, lhsnewvar)
+        lhsendlabel = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim][0][:-2]
+        self.generatejump(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], endlabel)
+        self.Scopes[-1].dim = falseind
+        if type(node.rhs).__name__ == "ASTConstExprContextNode":
+            pass
+        else:
+            rhsnewvar = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            self.NameSpace[-1].VarsBank[rhsnewvar] = rhsnewvar
+            self.Scopes[-1].VarsBank[rhsnewvar] = self.typeget(node.rhs)[0]
+            self.generateload(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], self.typeget(node.rhs)[0], node.rhs, rhsnewvar)
+        rhsendlabel = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim][0][:-2]
+        self.generatejump(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], endlabel)
+        self.Scopes[-1].dim = endind
 
     def llvmASTControlNode(self, node):
         where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
@@ -3119,6 +3159,27 @@ declare ptr @malloc(i32)
                     self.Scopes[-1].tempvar += 1
                     self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append(f"{frombool} = icmp {self.logic[vars.op]} ptr {lhsvar}, null\n")
                     self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append(f"{target} = zext i1 {frombool} to i8\n")
+                elif rhstype == typeclass(t=typeEnum.STRING) and lhstype == typeclass(t=typeEnum.STRING):
+                    if type(vars.lhs).__name__ == "ASTConstExprContextNode" and type(vars.rhs).__name__ == "ASTConstExprContextNode":
+                        if vars.lhs.value == vars.rhs.value:
+                            self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append(f"{target} = load i8, ptr @.true\n")
+                        else:
+                            self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append(f"{target} = load i8, ptr @.false\n")
+                    else:
+                        lhsvar = f"%._{self.Scopes[-1].tempvar}"
+                        self.Scopes[-1].tempvar += 1
+                        self.Scopes[-1].VarsBank[lhsvar] = typeclass(t=typeEnum.STRING)
+                        self.NameSpace[-1].VarsBank[lhsvar] = lhsvar
+                        self.generateload(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], typeclass(t=typeEnum.STRING), vars.lhs, lhsvar)
+                        rhsvar = f"%._{self.Scopes[-1].tempvar}"
+                        self.Scopes[-1].tempvar += 1
+                        self.Scopes[-1].VarsBank[rhsvar] = typeclass(t=typeEnum.STRING)
+                        self.NameSpace[-1].VarsBank[rhsvar] = rhsvar
+                        self.generateload(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], typeclass(t=typeEnum.STRING), vars.rhs, rhsvar)
+                        frombool = f"%._{self.Scopes[-1].tempvar}"
+                        self.Scopes[-1].tempvar += 1
+                        self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append(f"{frombool} = icmp {self.logic[vars.op]} ptr {lhsvar}, {rhsvar}\n")
+                        self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append(f"{target} = zext i1 {frombool} to i8\n")
                 else:
                     raise Exception("TODO")
             elif typetodo.type == typeEnum.STRING:
@@ -3293,8 +3354,9 @@ declare ptr @malloc(i32)
                 rhsendlabel = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim][0][:-2]
                 self.generatejump(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], endlabel)
                 self.Scopes[-1].dim = endind
-                self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append(
-                    f"{target} = phi {self.llvmtypeclass(typetodo)} [ {lhsnewvar}, %{lhsendlabel} ], [ {rhsnewvar}, %{rhsendlabel} ]\n")
+                if typetodo != typeclass(t=typeEnum.VOID):
+                    self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append(
+                        f"{target} = phi {self.llvmtypeclass(typetodo)} [ {lhsnewvar}, %{lhsendlabel} ], [ {rhsnewvar}, %{rhsendlabel} ]\n")
         elif type(vars).__name__ == 'ASTFuncCallExprNode':
             if vars.id[:5] == 'CLASS':
                 newvar = f"%._{self.Scopes[-1].tempvar}"
@@ -3533,7 +3595,7 @@ if __name__ == "__main__":
     # builder.llvm(ast)
     # output.close()
     # commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Complier && clang-15 -m32 buildin.ll output.ll -o test && ./test"'
-    # input_data = ''
+    # input_data, output_data, exitcode = extract_input_output_exitcode(r"C:\Users\14908\Desktop\PPCA\Complier\test.txt")
     # process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
     # stdout, _ = process.communicate(input=input_data)
     # print(stdout.strip(), process.returncode)
