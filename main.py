@@ -6,8 +6,32 @@ from py_parser.helloParser import helloParser
 from enum import Enum
 import sys
 from antlr4.error.ErrorListener import ErrorListener
+import subprocess
+import re
 
-output = open('output.ll', 'w')
+
+def extract_input_output_exitcode(file_path):
+    with open(file_path, 'r', encoding='utf-8') as file:
+        content = file.read()
+    input_regex = r'Input:\n=== input ===\n(.*?)\n=== end ==='
+    output_regex = r'Output:\n=== output ===\n(.*?)\n=== end ==='
+    exitcode_regex = r'ExitCode: (.+)'
+    input_match = re.search(input_regex, content, re.DOTALL)
+    output_match = re.search(output_regex, content, re.DOTALL)
+    exitcode_match = re.search(exitcode_regex, content)
+    if input_match:
+        input_data = input_match.group(1).strip()
+    else:
+        input_data = ""
+    if output_match:
+        output_data = output_match.group(1).strip()
+    else:
+        output_data = ""
+    if exitcode_match:
+        exitcode = exitcode_match.group(1).strip()
+    else:
+        exitcode = ""
+    return input_data, output_data, exitcode
 
 
 def getstring(str):
@@ -620,6 +644,7 @@ class ASTBuilder:
         self.initnum = 0
         self.classScope = []
         self.FunctionScope = []
+
     def build(self, node):
         if not isinstance(node, ParserRuleContext):
             raise Exception(f"{node} must be a node, not a {type(node)}")
@@ -1149,7 +1174,7 @@ class ASTBuilder:
                                 temp = False
                                 break
                         if temp:
-                            res =  self.ClassBank[self.Scopes[i].name].FunctionMember[node.id].retType, False, True
+                            res = self.ClassBank[self.Scopes[i].name].FunctionMember[node.id].retType, False, True
                             node.id = "CLASS." + self.Scopes[i].name + '.' + node.id
                             return res
 
@@ -1573,6 +1598,7 @@ declare ptr @malloc(i32)
         if node.ConstructFunc != ASTEmptyNode():
             funcname = f"CLASS.{node.id}.{node.id}"
             self.allfunc[funcname] = ['ptr']
+
     def llvmASTFuncCallExprNode(self, node):
         retType = self.FuncBank[node.id].retType
         if retType == typeclass(t=typeEnum.VOID):
@@ -1689,6 +1715,7 @@ declare ptr @malloc(i32)
         self.NameSpace.pop()
         self.classScope.pop()
         self.FunctionScope.pop()
+
     def llvmASTEmptyNode(self, node):
         return
 
@@ -1864,7 +1891,8 @@ declare ptr @malloc(i32)
                 newvars = f"%._{self.Scopes[-1].tempvar}"
                 self.Scopes[-1].tempvar += 1
                 where.append(f"{newvars} = load ptr, ptr %.arg_this\n")
-                where.append(f"{newvar} = getelementptr %.CLASS.{self.classScope[-1][node.id][1]}, ptr {newvars}, i32 0, i32 {self.classScope[-1][node.id][2]}\n")
+                where.append(
+                    f"{newvar} = getelementptr %.CLASS.{self.classScope[-1][node.id][1]}, ptr {newvars}, i32 0, i32 {self.classScope[-1][node.id][2]}\n")
                 return newvar
             return self.getname(node.id)
         elif type(node).__name__ == "ASTPrefixUpdateExprNode":
@@ -2496,7 +2524,7 @@ declare ptr @malloc(i32)
             self.Scopes[-1].tempvar += 1
             self.NameSpace[-1].VarsBank[bodyvar] = bodyvar
             self.Scopes[-1].VarsBank[bodyvar] = self.typeget(init.expr.body)[0]
-            self.generateload(where,self.typeget(init.expr.body)[0],bodyptr, bodyvar)
+            self.generateload(where, self.typeget(init.expr.body)[0], bodyptr, bodyvar)
             newvars = f"%._{self.Scopes[-1].tempvar}"
             self.Scopes[-1].tempvar += 1
             self.NameSpace[-1].VarsBank[newvars] = newvars
@@ -2841,7 +2869,6 @@ declare ptr @malloc(i32)
         self.Scopes[-1].dim = forincind
         self.generateloopinc(root[self.Scopes[-1].dim], node.step, forcond)
         self.Scopes[-1].dim = forendind
-
 
     def llvmASTLoopWhileNode(self, node):
         root = self.llvmfunc[self.getfuncname()][2]
@@ -3491,16 +3518,83 @@ if __name__ == "__main__":
     # sys.stdin = codecs.getreader('utf-8')(sys.stdin)
     # input_stream = StdinStream()
 
-    input_stream = FileStream(r"C:\Users\14908\Desktop\PPCA\Complier\test.txt", encoding="utf-8")
-    lexer = helloLexer(input_stream)
-    lexer._listeners = [MyErrorListener()]
-    stream = CommonTokenStream(lexer)
-    parser = helloParser(stream)
-    parser._listeners = [MyErrorListener()]
-    cst = parser.body()
-    builder = ASTBuilder()
-    ast = builder.build(cst)
-    flag = builder.check(ast)
-    print(flag)
-    builder.llvm(ast)
-    output.close()
+    # output = open('output.ll', 'w')
+    # input_stream = FileStream(r"C:\Users\14908\Desktop\PPCA\Complier\test.txt", encoding="utf-8")
+    # lexer = helloLexer(input_stream)
+    # lexer._listeners = [MyErrorListener()]
+    # stream = CommonTokenStream(lexer)
+    # parser = helloParser(stream)
+    # parser._listeners = [MyErrorListener()]
+    # cst = parser.body()
+    # builder = ASTBuilder()
+    # ast = builder.build(cst)
+    # flag = builder.check(ast)
+    # print(flag)
+    # builder.llvm(ast)
+    # output.close()
+    # commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Complier && clang-15 -m32 buildin.ll output.ll -o test && ./test"'
+    # input_data = ''
+    # process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
+    # stdout, _ = process.communicate(input=input_data)
+    # print(stdout.strip(), process.returncode)
+
+    root = os.listdir(sys.argv[1])
+    for files in root:
+        if files[-3:] == '.mx':
+            input_data, output_data, exitcode = extract_input_output_exitcode(sys.argv[1] + '\\' + files)
+            try:
+                print(files + ':', end='')
+                output = open('output.ll', 'w')
+                input_stream = FileStream(sys.argv[1] + '\\' + files, encoding="utf-8")
+                lexer = helloLexer(input_stream)
+                lexer._listeners = [MyErrorListener()]
+                stream = CommonTokenStream(lexer)
+                parser = helloParser(stream)
+                parser._listeners = [MyErrorListener()]
+                cst = parser.body()
+                builder = ASTBuilder()
+                ast = builder.build(cst)
+                flag = builder.check(ast)
+                builder.llvm(ast)
+                output.flush()
+                commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Complier && clang-15 -m32 buildin.ll output.ll -o test && ./test"'
+                process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
+                stdout, _ = process.communicate(input=input_data)
+                print(stdout.strip() == output_data, process.returncode == int(exitcode.strip()))
+            except Exception as e:
+                flag = False
+        elif files[-3:] == 'txt':
+            continue
+        elif files[-3:] == 'cpp':
+            continue
+        elif files[-2:] == '.c':
+            continue
+        elif files[-3:] == 'csv':
+            continue
+        elif files[-3:] == '.py':
+            continue
+        else:
+            subfile = os.listdir(sys.argv[1] + '\\' + files)
+            for file in subfile:
+                input_data, output_data, exitcode = extract_input_output_exitcode(sys.argv[1] + '\\' + files + '\\' + file)
+                try:
+                    print(file + ':', end='')
+                    output = open('output.ll', 'w')
+                    input_stream = FileStream(sys.argv[1] + '\\' + files + '\\' + file, encoding="utf-8")
+                    lexer = helloLexer(input_stream)
+                    lexer._listeners = [MyErrorListener()]
+                    stream = CommonTokenStream(lexer)
+                    parser = helloParser(stream)
+                    parser._listeners = [MyErrorListener()]
+                    cst = parser.body()
+                    builder = ASTBuilder()
+                    ast = builder.build(cst)
+                    flag = builder.check(ast)
+                    builder.llvm(ast)
+                    output.flush()
+                    commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Complier && clang-15 -m32 buildin.ll output.ll -o test && ./test"'
+                    process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
+                    stdout, _ = process.communicate(input=input_data)
+                    print(stdout.strip() == output_data, process.returncode == int(exitcode.strip()))
+                except Exception as e:
+                    flag = False
