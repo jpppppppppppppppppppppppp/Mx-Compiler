@@ -1,276 +1,372 @@
 ; ModuleID = 'builtin.c'
 source_filename = "builtin.c"
-target datalayout = "e-m:e-p:32:32-p270:32:32-p271:32:32-p272:64:64-f64:32:64-f80:32-n8:16:32-S128"
-target triple = "i386-pc-linux-gnu"
+target datalayout = "e-m:e-p:32:32-i64:64-n32-S128"
+target triple = "riscv32-unknown-unknown-elf"
 
 @.str = private unnamed_addr constant [3 x i8] c"%s\00", align 1
+@.str.1 = private unnamed_addr constant [4 x i8] c"%s\0A\00", align 1
 @.str.2 = private unnamed_addr constant [3 x i8] c"%d\00", align 1
 @.str.3 = private unnamed_addr constant [4 x i8] c"%d\0A\00", align 1
 
-; Function Attrs: nofree nounwind sspstrong uwtable
-define dso_local void @print(ptr noundef %str) local_unnamed_addr #0 {
-entry:
-  %call = tail call i32 (ptr, ...) @printf(ptr noundef nonnull @.str, ptr noundef %str)
+; Function Attrs: noinline nounwind optnone
+define dso_local void @print(ptr noundef %0) #0 {
+  %2 = alloca ptr, align 4
+  store ptr %0, ptr %2, align 4
+  %3 = load ptr, ptr %2, align 4
+  %4 = call i32 (ptr, ...) @printf(ptr noundef @.str, ptr noundef %3) #2
   ret void
 }
 
-; Function Attrs: nofree nounwind
-declare noundef i32 @printf(ptr nocapture noundef readonly, ...) local_unnamed_addr #1
+declare dso_local i32 @printf(ptr noundef, ...) #1
 
-; Function Attrs: nofree nounwind sspstrong uwtable
-define dso_local void @println(ptr nocapture noundef readonly %str) local_unnamed_addr #0 {
-entry:
-  %puts = tail call i32 @puts(ptr nonnull dereferenceable(1) %str)
+; Function Attrs: noinline nounwind optnone
+define dso_local void @println(ptr noundef %0) #0 {
+  %2 = alloca ptr, align 4
+  store ptr %0, ptr %2, align 4
+  %3 = load ptr, ptr %2, align 4
+  %4 = call i32 (ptr, ...) @printf(ptr noundef @.str.1, ptr noundef %3) #2
   ret void
 }
 
-; Function Attrs: nofree nounwind sspstrong uwtable
-define dso_local void @printInt(i32 noundef %n) local_unnamed_addr #0 {
-entry:
-  %call = tail call i32 (ptr, ...) @printf(ptr noundef nonnull @.str.2, i32 noundef %n)
+; Function Attrs: noinline nounwind optnone
+define dso_local void @printInt(i32 noundef %0) #0 {
+  %2 = alloca i32, align 4
+  store i32 %0, ptr %2, align 4
+  %3 = load i32, ptr %2, align 4
+  %4 = call i32 (ptr, ...) @printf(ptr noundef @.str.2, i32 noundef %3) #2
   ret void
 }
 
-; Function Attrs: nofree nounwind sspstrong uwtable
-define dso_local void @printlnInt(i32 noundef %n) local_unnamed_addr #0 {
-entry:
-  %call = tail call i32 (ptr, ...) @printf(ptr noundef nonnull @.str.3, i32 noundef %n)
+; Function Attrs: noinline nounwind optnone
+define dso_local void @printlnInt(i32 noundef %0) #0 {
+  %2 = alloca i32, align 4
+  store i32 %0, ptr %2, align 4
+  %3 = load i32, ptr %2, align 4
+  %4 = call i32 (ptr, ...) @printf(ptr noundef @.str.3, i32 noundef %3) #2
   ret void
 }
 
-; Function Attrs: nofree nounwind sspstrong uwtable
-define dso_local ptr @getString() local_unnamed_addr #0 {
-entry:
-  %call = tail call dereferenceable_or_null(4096) ptr @malloc(i32 noundef 4096) #10
-  %call1 = tail call i32 (ptr, ...) @scanf(ptr noundef nonnull @.str, ptr noundef %call)
-  ret ptr %call
+; Function Attrs: noinline nounwind optnone
+define dso_local ptr @getString() #0 {
+  %1 = alloca ptr, align 4
+  %2 = call ptr @malloc(i32 noundef 4096) #2
+  store ptr %2, ptr %1, align 4
+  %3 = load ptr, ptr %1, align 4
+  %4 = call i32 (ptr, ...) @scanf(ptr noundef @.str, ptr noundef %3) #3
+  %5 = load ptr, ptr %1, align 4
+  ret ptr %5
 }
 
-; Function Attrs: argmemonly mustprogress nocallback nofree nosync nounwind willreturn
-declare void @llvm.lifetime.start.p0(i64 immarg, ptr nocapture) #2
+declare dso_local ptr @malloc(i32 noundef) #1
 
-; Function Attrs: inaccessiblememonly mustprogress nofree nounwind willreturn allockind("alloc,uninitialized") allocsize(0)
-declare noalias noundef ptr @malloc(i32 noundef) local_unnamed_addr #3
+declare dso_local i32 @scanf(ptr noundef, ...) #1
 
-; Function Attrs: nofree nounwind
-declare noundef i32 @scanf(ptr nocapture noundef readonly, ...) local_unnamed_addr #1
-
-; Function Attrs: argmemonly mustprogress nocallback nofree nosync nounwind willreturn
-declare void @llvm.lifetime.end.p0(i64 immarg, ptr nocapture) #2
-
-; Function Attrs: nofree nounwind sspstrong uwtable
-define dso_local i32 @getInt() local_unnamed_addr #0 {
-entry:
-  %n = alloca i32, align 4
-  call void @llvm.lifetime.start.p0(i64 4, ptr nonnull %n) #11
-  %call = call i32 (ptr, ...) @scanf(ptr noundef nonnull @.str.2, ptr noundef nonnull %n)
-  %0 = load i32, ptr %n, align 4, !tbaa !6
-  call void @llvm.lifetime.end.p0(i64 4, ptr nonnull %n) #11
-  ret i32 %0
+; Function Attrs: noinline nounwind optnone
+define dso_local i32 @getInt() #0 {
+  %1 = alloca i32, align 4
+  %2 = call i32 (ptr, ...) @scanf(ptr noundef @.str.2, ptr noundef %1) #3
+  %3 = load i32, ptr %1, align 4
+  ret i32 %3
 }
 
-; Function Attrs: nofree nounwind sspstrong uwtable
-define dso_local noalias ptr @toString(i32 noundef %n) local_unnamed_addr #0 {
-entry:
-  %call = tail call dereferenceable_or_null(16) ptr @malloc(i32 noundef 16) #10
-  %call1 = tail call i32 (ptr, ptr, ...) @sprintf(ptr noundef nonnull dereferenceable(1) %call, ptr noundef nonnull @.str.2, i32 noundef %n)
-  ret ptr %call
+; Function Attrs: noinline nounwind optnone
+define dso_local ptr @toString(i32 noundef %0) #0 {
+  %2 = alloca i32, align 4
+  %3 = alloca ptr, align 4
+  store i32 %0, ptr %2, align 4
+  %4 = call ptr @malloc(i32 noundef 16) #2
+  store ptr %4, ptr %3, align 4
+  %5 = load ptr, ptr %3, align 4
+  %6 = load i32, ptr %2, align 4
+  %7 = call i32 (ptr, ptr, ...) @sprintf(ptr noundef %5, ptr noundef @.str.2, i32 noundef %6) #3
+  %8 = load ptr, ptr %3, align 4
+  ret ptr %8
 }
 
-; Function Attrs: nofree nounwind
-declare noundef i32 @sprintf(ptr noalias nocapture noundef writeonly, ptr nocapture noundef readonly, ...) local_unnamed_addr #1
+declare dso_local i32 @sprintf(ptr noundef, ptr noundef, ...) #1
 
-; Function Attrs: mustprogress nofree nounwind sspstrong willreturn uwtable
-define dso_local noalias ptr @string.string() local_unnamed_addr #4 {
-entry:
-  %call = tail call dereferenceable_or_null(1) ptr @malloc(i32 noundef 1) #10
-  store i8 0, ptr %call, align 1, !tbaa !10
-  ret ptr %call
+; Function Attrs: noinline nounwind optnone
+define dso_local ptr @string.string() #0 {
+  %1 = alloca ptr, align 4
+  %2 = call ptr @malloc(i32 noundef 1) #2
+  store ptr %2, ptr %1, align 4
+  %3 = load ptr, ptr %1, align 4
+  %4 = getelementptr inbounds i8, ptr %3, i32 0
+  store i8 0, ptr %4, align 1
+  %5 = load ptr, ptr %1, align 4
+  ret ptr %5
 }
 
-; Function Attrs: argmemonly mustprogress nofree nounwind readonly sspstrong willreturn uwtable
-define dso_local i32 @string.length(ptr nocapture noundef readonly %__this) local_unnamed_addr #5 {
-entry:
-  %call = tail call i32 @strlen(ptr noundef nonnull dereferenceable(1) %__this)
-  ret i32 %call
+; Function Attrs: noinline nounwind optnone
+define dso_local i32 @string.length(ptr noundef %0) #0 {
+  %2 = alloca ptr, align 4
+  store ptr %0, ptr %2, align 4
+  %3 = load ptr, ptr %2, align 4
+  %4 = call i32 @strlen(ptr noundef %3) #2
+  ret i32 %4
 }
 
-; Function Attrs: argmemonly mustprogress nofree nounwind readonly willreturn
-declare i32 @strlen(ptr nocapture noundef) local_unnamed_addr #6
+declare dso_local i32 @strlen(ptr noundef) #1
 
-; Function Attrs: mustprogress nofree nounwind sspstrong willreturn uwtable
-define dso_local noalias ptr @string.substring(ptr nocapture noundef readonly %__this, i32 noundef %left, i32 noundef %right) local_unnamed_addr #4 {
-entry:
-  %sub = sub nsw i32 %right, %left
-  %add = add nsw i32 %sub, 1
-  %call = tail call ptr @malloc(i32 noundef %add) #10
-  %add.ptr = getelementptr inbounds i8, ptr %__this, i32 %left
-  tail call void @llvm.memcpy.p0.p0.i32(ptr align 1 %call, ptr align 1 %add.ptr, i32 %sub, i1 false)
-  %arrayidx = getelementptr inbounds i8, ptr %call, i32 %sub
-  store i8 0, ptr %arrayidx, align 1, !tbaa !10
-  ret ptr %call
+; Function Attrs: noinline nounwind optnone
+define dso_local ptr @string.substring(ptr noundef %0, i32 noundef %1, i32 noundef %2) #0 {
+  %4 = alloca ptr, align 4
+  %5 = alloca i32, align 4
+  %6 = alloca i32, align 4
+  %7 = alloca i32, align 4
+  %8 = alloca ptr, align 4
+  store ptr %0, ptr %4, align 4
+  store i32 %1, ptr %5, align 4
+  store i32 %2, ptr %6, align 4
+  %9 = load i32, ptr %6, align 4
+  %10 = load i32, ptr %5, align 4
+  %11 = sub nsw i32 %9, %10
+  store i32 %11, ptr %7, align 4
+  %12 = load i32, ptr %7, align 4
+  %13 = add nsw i32 %12, 1
+  %14 = call ptr @malloc(i32 noundef %13) #2
+  store ptr %14, ptr %8, align 4
+  %15 = load ptr, ptr %8, align 4
+  %16 = load ptr, ptr %4, align 4
+  %17 = load i32, ptr %5, align 4
+  %18 = getelementptr inbounds i8, ptr %16, i32 %17
+  %19 = load i32, ptr %7, align 4
+  %20 = call ptr @memcpy(ptr noundef %15, ptr noundef %18, i32 noundef %19) #2
+  %21 = load ptr, ptr %8, align 4
+  %22 = load i32, ptr %7, align 4
+  %23 = getelementptr inbounds i8, ptr %21, i32 %22
+  store i8 0, ptr %23, align 1
+  %24 = load ptr, ptr %8, align 4
+  ret ptr %24
 }
 
-; Function Attrs: argmemonly mustprogress nocallback nofree nounwind willreturn
-declare void @llvm.memcpy.p0.p0.i32(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i32, i1 immarg) #7
+declare dso_local ptr @memcpy(ptr noundef, ptr noundef, i32 noundef) #1
 
-; Function Attrs: nofree nounwind sspstrong uwtable
-define dso_local i32 @string.parseInt(ptr nocapture noundef readonly %__this) local_unnamed_addr #0 {
-entry:
-  %n = alloca i32, align 4
-  call void @llvm.lifetime.start.p0(i64 4, ptr nonnull %n) #11
-  %call = call i32 (ptr, ptr, ...) @sscanf(ptr noundef %__this, ptr noundef nonnull @.str.2, ptr noundef nonnull %n)
-  %0 = load i32, ptr %n, align 4, !tbaa !6
-  call void @llvm.lifetime.end.p0(i64 4, ptr nonnull %n) #11
-  ret i32 %0
+; Function Attrs: noinline nounwind optnone
+define dso_local i32 @string.parseInt(ptr noundef %0) #0 {
+  %2 = alloca ptr, align 4
+  %3 = alloca i32, align 4
+  store ptr %0, ptr %2, align 4
+  %4 = load ptr, ptr %2, align 4
+  %5 = call i32 (ptr, ptr, ...) @sscanf(ptr noundef %4, ptr noundef @.str.2, ptr noundef %3) #3
+  %6 = load i32, ptr %3, align 4
+  ret i32 %6
 }
 
-; Function Attrs: nofree nounwind
-declare noundef i32 @sscanf(ptr nocapture noundef readonly, ptr nocapture noundef readonly, ...) local_unnamed_addr #1
+declare dso_local i32 @sscanf(ptr noundef, ptr noundef, ...) #1
 
-; Function Attrs: argmemonly mustprogress nofree norecurse nosync nounwind readonly sspstrong willreturn uwtable
-define dso_local i32 @string.ord(ptr nocapture noundef readonly %__this, i32 noundef %pos) local_unnamed_addr #8 {
-entry:
-  %arrayidx = getelementptr inbounds i8, ptr %__this, i32 %pos
-  %0 = load i8, ptr %arrayidx, align 1, !tbaa !10
-  %conv = sext i8 %0 to i32
-  ret i32 %conv
+; Function Attrs: noinline nounwind optnone
+define dso_local i32 @string.ord(ptr noundef %0, i32 noundef %1) #0 {
+  %3 = alloca ptr, align 4
+  %4 = alloca i32, align 4
+  store ptr %0, ptr %3, align 4
+  store i32 %1, ptr %4, align 4
+  %5 = load ptr, ptr %3, align 4
+  %6 = load i32, ptr %4, align 4
+  %7 = getelementptr inbounds i8, ptr %5, i32 %6
+  %8 = load i8, ptr %7, align 1
+  %9 = zext i8 %8 to i32
+  ret i32 %9
 }
 
-; Function Attrs: mustprogress nofree nounwind sspstrong willreturn uwtable
-define dso_local noalias ptr @string.add(ptr nocapture noundef readonly %str1, ptr nocapture noundef readonly %str2) local_unnamed_addr #4 {
-entry:
-  %call = tail call i32 @strlen(ptr noundef nonnull dereferenceable(1) %str1)
-  %call1 = tail call i32 @strlen(ptr noundef nonnull dereferenceable(1) %str2)
-  %add = add nsw i32 %call1, %call
-  %add2 = add nsw i32 %add, 1
-  %call3 = tail call ptr @malloc(i32 noundef %add2) #10
-  tail call void @llvm.memcpy.p0.p0.i32(ptr align 1 %call3, ptr align 1 %str1, i32 %call, i1 false)
-  %add.ptr = getelementptr inbounds i8, ptr %call3, i32 %call
-  tail call void @llvm.memcpy.p0.p0.i32(ptr align 1 %add.ptr, ptr align 1 %str2, i32 %call1, i1 false)
-  %arrayidx = getelementptr inbounds i8, ptr %call3, i32 %add
-  store i8 0, ptr %arrayidx, align 1, !tbaa !10
-  ret ptr %call3
+; Function Attrs: noinline nounwind optnone
+define dso_local ptr @string.add(ptr noundef %0, ptr noundef %1) #0 {
+  %3 = alloca ptr, align 4
+  %4 = alloca ptr, align 4
+  %5 = alloca i32, align 4
+  %6 = alloca i32, align 4
+  %7 = alloca i32, align 4
+  %8 = alloca ptr, align 4
+  store ptr %0, ptr %3, align 4
+  store ptr %1, ptr %4, align 4
+  %9 = load ptr, ptr %3, align 4
+  %10 = call i32 @strlen(ptr noundef %9) #2
+  store i32 %10, ptr %5, align 4
+  %11 = load ptr, ptr %4, align 4
+  %12 = call i32 @strlen(ptr noundef %11) #2
+  store i32 %12, ptr %6, align 4
+  %13 = load i32, ptr %5, align 4
+  %14 = load i32, ptr %6, align 4
+  %15 = add nsw i32 %13, %14
+  store i32 %15, ptr %7, align 4
+  %16 = load i32, ptr %7, align 4
+  %17 = add nsw i32 %16, 1
+  %18 = call ptr @malloc(i32 noundef %17) #2
+  store ptr %18, ptr %8, align 4
+  %19 = load ptr, ptr %8, align 4
+  %20 = load ptr, ptr %3, align 4
+  %21 = load i32, ptr %5, align 4
+  %22 = call ptr @memcpy(ptr noundef %19, ptr noundef %20, i32 noundef %21) #2
+  %23 = load ptr, ptr %8, align 4
+  %24 = load i32, ptr %5, align 4
+  %25 = getelementptr inbounds i8, ptr %23, i32 %24
+  %26 = load ptr, ptr %4, align 4
+  %27 = load i32, ptr %6, align 4
+  %28 = call ptr @memcpy(ptr noundef %25, ptr noundef %26, i32 noundef %27) #2
+  %29 = load ptr, ptr %8, align 4
+  %30 = load i32, ptr %7, align 4
+  %31 = getelementptr inbounds i8, ptr %29, i32 %30
+  store i8 0, ptr %31, align 1
+  %32 = load ptr, ptr %8, align 4
+  ret ptr %32
 }
 
-; Function Attrs: argmemonly mustprogress nofree nounwind readonly sspstrong willreturn uwtable
-define dso_local zeroext i1 @string.equal(ptr nocapture noundef readonly %str1, ptr nocapture noundef readonly %str2) local_unnamed_addr #5 {
-entry:
-  %call = tail call i32 @strcmp(ptr noundef nonnull dereferenceable(1) %str1, ptr noundef nonnull dereferenceable(1) %str2)
-  %cmp = icmp eq i32 %call, 0
-  ret i1 %cmp
+; Function Attrs: noinline nounwind optnone
+define dso_local zeroext i1 @string.equal(ptr noundef %0, ptr noundef %1) #0 {
+  %3 = alloca ptr, align 4
+  %4 = alloca ptr, align 4
+  store ptr %0, ptr %3, align 4
+  store ptr %1, ptr %4, align 4
+  %5 = load ptr, ptr %3, align 4
+  %6 = load ptr, ptr %4, align 4
+  %7 = call i32 @strcmp(ptr noundef %5, ptr noundef %6) #3
+  %8 = icmp eq i32 %7, 0
+  ret i1 %8
 }
 
-; Function Attrs: argmemonly mustprogress nofree nounwind readonly willreturn
-declare i32 @strcmp(ptr nocapture noundef, ptr nocapture noundef) local_unnamed_addr #6
+declare dso_local i32 @strcmp(ptr noundef, ptr noundef) #1
 
-; Function Attrs: argmemonly mustprogress nofree nounwind readonly sspstrong willreturn uwtable
-define dso_local zeroext i1 @string.notEqual(ptr nocapture noundef readonly %str1, ptr nocapture noundef readonly %str2) local_unnamed_addr #5 {
-entry:
-  %call = tail call i32 @strcmp(ptr noundef nonnull dereferenceable(1) %str1, ptr noundef nonnull dereferenceable(1) %str2)
-  %cmp = icmp ne i32 %call, 0
-  ret i1 %cmp
+; Function Attrs: noinline nounwind optnone
+define dso_local zeroext i1 @string.notEqual(ptr noundef %0, ptr noundef %1) #0 {
+  %3 = alloca ptr, align 4
+  %4 = alloca ptr, align 4
+  store ptr %0, ptr %3, align 4
+  store ptr %1, ptr %4, align 4
+  %5 = load ptr, ptr %3, align 4
+  %6 = load ptr, ptr %4, align 4
+  %7 = call i32 @strcmp(ptr noundef %5, ptr noundef %6) #3
+  %8 = icmp ne i32 %7, 0
+  ret i1 %8
 }
 
-; Function Attrs: argmemonly mustprogress nofree nounwind readonly sspstrong willreturn uwtable
-define dso_local zeroext i1 @string.less(ptr nocapture noundef readonly %str1, ptr nocapture noundef readonly %str2) local_unnamed_addr #5 {
-entry:
-  %call = tail call i32 @strcmp(ptr noundef nonnull dereferenceable(1) %str1, ptr noundef nonnull dereferenceable(1) %str2)
-  %cmp = icmp slt i32 %call, 0
-  ret i1 %cmp
+; Function Attrs: noinline nounwind optnone
+define dso_local zeroext i1 @string.less(ptr noundef %0, ptr noundef %1) #0 {
+  %3 = alloca ptr, align 4
+  %4 = alloca ptr, align 4
+  store ptr %0, ptr %3, align 4
+  store ptr %1, ptr %4, align 4
+  %5 = load ptr, ptr %3, align 4
+  %6 = load ptr, ptr %4, align 4
+  %7 = call i32 @strcmp(ptr noundef %5, ptr noundef %6) #3
+  %8 = icmp slt i32 %7, 0
+  ret i1 %8
 }
 
-; Function Attrs: argmemonly mustprogress nofree nounwind readonly sspstrong willreturn uwtable
-define dso_local zeroext i1 @string.lessOrEqual(ptr nocapture noundef readonly %str1, ptr nocapture noundef readonly %str2) local_unnamed_addr #5 {
-entry:
-  %call = tail call i32 @strcmp(ptr noundef nonnull dereferenceable(1) %str1, ptr noundef nonnull dereferenceable(1) %str2)
-  %cmp = icmp slt i32 %call, 1
-  ret i1 %cmp
+; Function Attrs: noinline nounwind optnone
+define dso_local zeroext i1 @string.lessOrEqual(ptr noundef %0, ptr noundef %1) #0 {
+  %3 = alloca ptr, align 4
+  %4 = alloca ptr, align 4
+  store ptr %0, ptr %3, align 4
+  store ptr %1, ptr %4, align 4
+  %5 = load ptr, ptr %3, align 4
+  %6 = load ptr, ptr %4, align 4
+  %7 = call i32 @strcmp(ptr noundef %5, ptr noundef %6) #3
+  %8 = icmp sle i32 %7, 0
+  ret i1 %8
 }
 
-; Function Attrs: argmemonly mustprogress nofree nounwind readonly sspstrong willreturn uwtable
-define dso_local zeroext i1 @string.greater(ptr nocapture noundef readonly %str1, ptr nocapture noundef readonly %str2) local_unnamed_addr #5 {
-entry:
-  %call = tail call i32 @strcmp(ptr noundef nonnull dereferenceable(1) %str1, ptr noundef nonnull dereferenceable(1) %str2)
-  %cmp = icmp sgt i32 %call, 0
-  ret i1 %cmp
+; Function Attrs: noinline nounwind optnone
+define dso_local zeroext i1 @string.greater(ptr noundef %0, ptr noundef %1) #0 {
+  %3 = alloca ptr, align 4
+  %4 = alloca ptr, align 4
+  store ptr %0, ptr %3, align 4
+  store ptr %1, ptr %4, align 4
+  %5 = load ptr, ptr %3, align 4
+  %6 = load ptr, ptr %4, align 4
+  %7 = call i32 @strcmp(ptr noundef %5, ptr noundef %6) #3
+  %8 = icmp sgt i32 %7, 0
+  ret i1 %8
 }
 
-; Function Attrs: argmemonly mustprogress nofree nounwind readonly sspstrong willreturn uwtable
-define dso_local zeroext i1 @string.greaterOrEqual(ptr nocapture noundef readonly %str1, ptr nocapture noundef readonly %str2) local_unnamed_addr #5 {
-entry:
-  %call = tail call i32 @strcmp(ptr noundef nonnull dereferenceable(1) %str1, ptr noundef nonnull dereferenceable(1) %str2)
-  %cmp = icmp sgt i32 %call, -1
-  ret i1 %cmp
+; Function Attrs: noinline nounwind optnone
+define dso_local zeroext i1 @string.greaterOrEqual(ptr noundef %0, ptr noundef %1) #0 {
+  %3 = alloca ptr, align 4
+  %4 = alloca ptr, align 4
+  store ptr %0, ptr %3, align 4
+  store ptr %1, ptr %4, align 4
+  %5 = load ptr, ptr %3, align 4
+  %6 = load ptr, ptr %4, align 4
+  %7 = call i32 @strcmp(ptr noundef %5, ptr noundef %6) #3
+  %8 = icmp sge i32 %7, 0
+  ret i1 %8
 }
 
-; Function Attrs: argmemonly mustprogress nofree norecurse nosync nounwind readonly sspstrong willreturn uwtable
-define dso_local i32 @__array.size(ptr nocapture noundef readonly %__this) local_unnamed_addr #8 {
-entry:
-  %arrayidx = getelementptr inbounds i32, ptr %__this, i32 -1
-  %0 = load i32, ptr %arrayidx, align 4, !tbaa !6
-  ret i32 %0
+; Function Attrs: noinline nounwind optnone
+define dso_local i32 @__array.size(ptr noundef %0) #0 {
+  %2 = alloca ptr, align 4
+  store ptr %0, ptr %2, align 4
+  %3 = load ptr, ptr %2, align 4
+  %4 = getelementptr inbounds i32, ptr %3, i32 -1
+  %5 = load i32, ptr %4, align 4
+  ret i32 %5
 }
 
-; Function Attrs: mustprogress nofree nounwind sspstrong willreturn uwtable
-define dso_local noalias nonnull ptr @__newPtrArray(i32 noundef %size) local_unnamed_addr #4 {
-entry:
-  %shl = shl i32 %size, 2
-  %add = add nsw i32 %shl, 4
-  %call = tail call ptr @malloc(i32 noundef %add) #10
-  store i32 %size, ptr %call, align 4, !tbaa !6
-  %add.ptr = getelementptr inbounds i32, ptr %call, i32 1
-  ret ptr %add.ptr
+; Function Attrs: noinline nounwind optnone
+define dso_local ptr @__newPtrArray(i32 noundef %0) #0 {
+  %2 = alloca i32, align 4
+  %3 = alloca ptr, align 4
+  store i32 %0, ptr %2, align 4
+  %4 = load i32, ptr %2, align 4
+  %5 = shl i32 %4, 2
+  %6 = add nsw i32 %5, 4
+  %7 = call ptr @malloc(i32 noundef %6) #2
+  store ptr %7, ptr %3, align 4
+  %8 = load i32, ptr %2, align 4
+  %9 = load ptr, ptr %3, align 4
+  %10 = getelementptr inbounds i32, ptr %9, i32 0
+  store i32 %8, ptr %10, align 4
+  %11 = load ptr, ptr %3, align 4
+  %12 = getelementptr inbounds i32, ptr %11, i32 1
+  ret ptr %12
 }
 
-; Function Attrs: mustprogress nofree nounwind sspstrong willreturn uwtable
-define dso_local noalias nonnull ptr @__newIntArray(i32 noundef %size) local_unnamed_addr #4 {
-entry:
-  %shl = shl i32 %size, 2
-  %add = add nsw i32 %shl, 4
-  %call = tail call ptr @malloc(i32 noundef %add) #10
-  store i32 %size, ptr %call, align 4, !tbaa !6
-  %add.ptr = getelementptr inbounds i32, ptr %call, i32 1
-  ret ptr %add.ptr
+; Function Attrs: noinline nounwind optnone
+define dso_local ptr @__newIntArray(i32 noundef %0) #0 {
+  %2 = alloca i32, align 4
+  %3 = alloca ptr, align 4
+  store i32 %0, ptr %2, align 4
+  %4 = load i32, ptr %2, align 4
+  %5 = shl i32 %4, 2
+  %6 = add nsw i32 %5, 4
+  %7 = call ptr @malloc(i32 noundef %6) #2
+  store ptr %7, ptr %3, align 4
+  %8 = load i32, ptr %2, align 4
+  %9 = load ptr, ptr %3, align 4
+  %10 = getelementptr inbounds i32, ptr %9, i32 0
+  store i32 %8, ptr %10, align 4
+  %11 = load ptr, ptr %3, align 4
+  %12 = getelementptr inbounds i32, ptr %11, i32 1
+  ret ptr %12
 }
 
-; Function Attrs: mustprogress nofree nounwind sspstrong willreturn uwtable
-define dso_local noalias nonnull ptr @__newBoolArray(i32 noundef %size) local_unnamed_addr #4 {
-entry:
-  %add = add nsw i32 %size, 4
-  %call = tail call ptr @malloc(i32 noundef %add) #10
-  store i32 %size, ptr %call, align 4, !tbaa !6
-  %add.ptr = getelementptr inbounds i32, ptr %call, i32 1
-  ret ptr %add.ptr
+; Function Attrs: noinline nounwind optnone
+define dso_local ptr @__newBoolArray(i32 noundef %0) #0 {
+  %2 = alloca i32, align 4
+  %3 = alloca ptr, align 4
+  store i32 %0, ptr %2, align 4
+  %4 = load i32, ptr %2, align 4
+  %5 = add nsw i32 %4, 4
+  %6 = call ptr @malloc(i32 noundef %5) #2
+  store ptr %6, ptr %3, align 4
+  %7 = load i32, ptr %2, align 4
+  %8 = load ptr, ptr %3, align 4
+  %9 = getelementptr inbounds i32, ptr %8, i32 0
+  store i32 %7, ptr %9, align 4
+  %10 = load ptr, ptr %3, align 4
+  %11 = getelementptr inbounds i32, ptr %10, i32 1
+  ret ptr %11
 }
 
-; Function Attrs: nofree nounwind
-declare noundef i32 @puts(ptr nocapture noundef readonly) local_unnamed_addr #9
+attributes #0 = { noinline nounwind optnone "frame-pointer"="all" "min-legal-vector-width"="0" "no-builtin-malloc" "no-builtin-memcpy" "no-builtin-printf" "no-builtin-strlen" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-features"="+a,+c,+m,+relax,-save-restore" }
+attributes #1 = { "frame-pointer"="all" "no-builtin-malloc" "no-builtin-memcpy" "no-builtin-printf" "no-builtin-strlen" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-features"="+a,+c,+m,+relax,-save-restore" }
+attributes #2 = { nobuiltin "no-builtin-malloc" "no-builtin-memcpy" "no-builtin-printf" "no-builtin-strlen" }
+attributes #3 = { "no-builtin-malloc" "no-builtin-memcpy" "no-builtin-printf" "no-builtin-strlen" }
 
-attributes #0 = { nofree nounwind sspstrong uwtable "frame-pointer"="none" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="pentium4" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
-attributes #1 = { nofree nounwind "frame-pointer"="none" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="pentium4" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
-attributes #2 = { argmemonly mustprogress nocallback nofree nosync nounwind willreturn }
-attributes #3 = { inaccessiblememonly mustprogress nofree nounwind willreturn allockind("alloc,uninitialized") allocsize(0) "alloc-family"="malloc" "frame-pointer"="none" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="pentium4" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
-attributes #4 = { mustprogress nofree nounwind sspstrong willreturn uwtable "frame-pointer"="none" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="pentium4" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
-attributes #5 = { argmemonly mustprogress nofree nounwind readonly sspstrong willreturn uwtable "frame-pointer"="none" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="pentium4" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
-attributes #6 = { argmemonly mustprogress nofree nounwind readonly willreturn "frame-pointer"="none" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="pentium4" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
-attributes #7 = { argmemonly mustprogress nocallback nofree nounwind willreturn }
-attributes #8 = { argmemonly mustprogress nofree norecurse nosync nounwind readonly sspstrong willreturn uwtable "frame-pointer"="none" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="pentium4" "target-features"="+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
-attributes #9 = { nofree nounwind }
-attributes #10 = { allocsize(0) }
-attributes #11 = { nounwind }
+!llvm.module.flags = !{!0, !1, !2, !3}
+!llvm.ident = !{!4}
 
-!llvm.module.flags = !{!0, !1, !2, !3, !4}
-!llvm.ident = !{!5}
-
-!0 = !{i32 1, !"NumRegisterParameters", i32 0}
-!1 = !{i32 1, !"wchar_size", i32 4}
-!2 = !{i32 7, !"PIC Level", i32 2}
-!3 = !{i32 7, !"PIE Level", i32 2}
-!4 = !{i32 7, !"uwtable", i32 2}
-!5 = !{!"clang version 15.0.7"}
-!6 = !{!7, !7, i64 0}
-!7 = !{!"int", !8, i64 0}
-!8 = !{!"omnipotent char", !9, i64 0}
-!9 = !{!"Simple C/C++ TBAA"}
-!10 = !{!8, !8, i64 0}
+!0 = !{i32 1, !"wchar_size", i32 4}
+!1 = !{i32 1, !"target-abi", !"ilp32"}
+!2 = !{i32 7, !"frame-pointer", i32 2}
+!3 = !{i32 1, !"SmallDataLimit", i32 8}
+!4 = !{!"Ubuntu clang version 15.0.7"}
