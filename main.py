@@ -647,9 +647,9 @@ def llvmstring(node):
     elif node[0] == llvmEnum.Binary:
         return f"\t{node[1]} = {node[2]} {node[3]} {node[4]}, {node[5]}\n"
     elif node[0] == llvmEnum.FuncCall:
-        return f"\t{node[1]} =  call {node[2]} @{node[3]}( " + ','.join(map(lambda x:x[0]+' '+x[1],node[4])) + ' )\n'
+        return f"\t{node[1]} =  call {node[2]} @{node[3]}( " + ','.join(map(lambda x: x[0] + ' ' + x[1], node[4])) + ' )\n'
     elif node[0] == llvmEnum.FuncVoid:
-        return f"\tcall void @{node[1]}( " + ','.join(map(lambda x:x[0]+' '+x[1],node[2])) + ' )\n'
+        return f"\tcall void @{node[1]}( " + ','.join(map(lambda x: x[0] + ' ' + x[1], node[2])) + ' )\n'
     else:
         raise Exception("Warning")
 
