@@ -8,7 +8,7 @@ import sys
 from antlr4.error.ErrorListener import ErrorListener
 import subprocess
 import re
-
+import codecs
 
 def extract_input_output_exitcode(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
@@ -1717,7 +1717,7 @@ declare ptr @malloc(i32)
             self.Scopes[-1].VarsBank[membername] = self.ClassBank[node.id].ClassMember[membername].type
         if node.ConstructFunc != ASTEmptyNode():
             funcname = f"CLASS.{node.id}.{node.id}"
-            self.llvmfunc[funcname] = ['void', [], [[[llvmEnum.Label, 'entry']]]]
+            self.llvmfunc[funcname] = ['void', [], [[[llvmEnum.Label, 'entry']], [[llvmEnum.Label, 'return']]]]
             self.Scopes.append(Scope(type=ScopeEnum.Func, name=funcname, dim=0, tempvar=0))
             self.NameSpace.append(Scope(type=ScopeEnum.Func, name=funcname, dim=0))
             self.llvmfunc[funcname][1].append([])
@@ -1732,17 +1732,28 @@ declare ptr @malloc(i32)
             self.generatestore(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.CLASS, name=node.id), argvar, f"%.this")
             for smt in node.ConstructFunc.BlockSmt.Smt:
                 self.llvm(smt)
-            self.generatedefaultret(self.llvmfunc[funcname][2][self.Scopes[-1].dim], node.ConstructFunc.retType)
+            self.generatejump(self.llvmfunc[funcname][2][self.Scopes[-1].dim], 'return')
+            self.generatedefaultret(self.llvmfunc[funcname][2][1], node.ConstructFunc.retType)
             self.Scopes.pop()
             self.NameSpace.pop()
         for func in node.FunctionMember:
             funcname = f"CLASS.{node.id}.{func.id}"
             if func.retType == typeclass(t=typeEnum.BOOL):
-                self.llvmfunc[funcname] = ['i1', [], [[[llvmEnum.Label, 'entry']]]]
+                self.llvmfunc[funcname] = ['i1', [], [[[llvmEnum.Label, 'entry']], [[llvmEnum.Label, 'return']]]]
             else:
-                self.llvmfunc[funcname] = [self.llvmtypeclass(func.retType), [], [[[llvmEnum.Label, 'entry']]]]
+                self.llvmfunc[funcname] = [self.llvmtypeclass(func.retType), [], [[[llvmEnum.Label, 'entry']], [[llvmEnum.Label, 'return']]]]
             self.Scopes.append(Scope(type=ScopeEnum.Func, name=funcname, dim=0, tempvar=0))
             self.NameSpace.append(Scope(type=ScopeEnum.Func, name=funcname, dim=0))
+            if func.retType != typeclass(t=typeEnum.VOID):
+                if func.retType == typeclass(t=typeEnum.BOOL):
+                    self.llvmfunc[funcname][2][0].append([llvmEnum.Alloca, '%.return', 'i32'])
+                    self.llvmfunc[funcname][2][0].append([llvmEnum.Store, 'i32', 0, '%.return'])
+                elif func.retType == typeclass(t=typeEnum.INT):
+                    self.llvmfunc[funcname][2][0].append([llvmEnum.Alloca, '%.return', 'i32'])
+                    self.llvmfunc[funcname][2][0].append([llvmEnum.Store, 'i32', 0, '%.return'])
+                else:
+                    self.llvmfunc[funcname][2][0].append([llvmEnum.Alloca, '%.return', 'ptr'])
+                    self.llvmfunc[funcname][2][0].append([llvmEnum.Store, 'ptr', 'null', '%.return'])
             self.llvmfunc[funcname][1].append([])
             self.llvmfunc[funcname][1][-1].append('ptr')
             argvar = f"%.arg_this"
@@ -1767,7 +1778,8 @@ declare ptr @malloc(i32)
                 self.generatestore(self.llvmfunc[funcname][2][0], arg.type, argvar, f"%.{arg.id}")
             for smt in func.BlockSmt.Smt:
                 self.llvm(smt)
-            self.generatedefaultret(self.llvmfunc[funcname][2][self.Scopes[-1].dim], func.retType)
+            self.generatejump(self.llvmfunc[funcname][2][self.Scopes[-1].dim], 'return')
+            self.generatedefaultret(self.llvmfunc[funcname][2][1], func.retType)
             self.Scopes.pop()
             self.NameSpace.pop()
         self.Scopes.pop()
@@ -1781,11 +1793,21 @@ declare ptr @malloc(i32)
     def llvmASTFunctiondeclarationContextNode(self, node):
         funcname = f"{node.id}"
         if node.retType == typeclass(t=typeEnum.BOOL):
-            self.llvmfunc[funcname] = ['i1', [], [[[llvmEnum.Label, 'entry']]]]
+            self.llvmfunc[funcname] = ['i1', [], [[[llvmEnum.Label, 'entry']], [[llvmEnum.Label, 'return']]]]
         else:
-            self.llvmfunc[funcname] = [self.llvmtypeclass(node.retType), [], [[[llvmEnum.Label, 'entry']]]]
+            self.llvmfunc[funcname] = [self.llvmtypeclass(node.retType), [], [[[llvmEnum.Label, 'entry']], [[llvmEnum.Label, 'return']]]]
         self.Scopes.append(Scope(type=ScopeEnum.Func, name=funcname, dim=0, tempvar=0))
         self.NameSpace.append(Scope(type=ScopeEnum.Func, name=funcname, dim=0))
+        if node.retType != typeclass(t=typeEnum.VOID):
+            if node.retType == typeclass(t=typeEnum.BOOL):
+                self.llvmfunc[funcname][2][0].append([llvmEnum.Alloca, '%.return', 'i32'])
+                self.llvmfunc[funcname][2][0].append([llvmEnum.Store, 'i32', 0, '%.return'])
+            elif node.retType == typeclass(t=typeEnum.INT):
+                self.llvmfunc[funcname][2][0].append([llvmEnum.Alloca, '%.return', 'i32'])
+                self.llvmfunc[funcname][2][0].append([llvmEnum.Store, 'i32', 0, '%.return'])
+            else:
+                self.llvmfunc[funcname][2][0].append([llvmEnum.Alloca, '%.return', 'ptr'])
+                self.llvmfunc[funcname][2][0].append([llvmEnum.Store, 'ptr', 'null', '%.return'])
         for arg in node.arglist:
             self.llvmfunc[funcname][1].append([])
             self.llvmfunc[funcname][1][-1].append(self.llvmtypeclass(arg.type))
@@ -1802,21 +1824,40 @@ declare ptr @malloc(i32)
                 self.generateFuncCall(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.VOID), f"_init.{i}", [], None)
         for smt in node.BlockSmt.Smt:
             self.llvm(smt)
-        self.generatedefaultret(self.llvmfunc[funcname][2][self.Scopes[-1].dim], node.retType)
+        self.generatejump(self.llvmfunc[funcname][2][self.Scopes[-1].dim], 'return')
+        self.generatedefaultret(self.llvmfunc[funcname][2][1], node.retType)
         self.Scopes.pop()
         self.NameSpace.pop()
 
     def generatedefaultret(self, where, typetodo):
         if typetodo.dim > 0:
-            where.append([llvmEnum.Return, 'ptr', 'null'])
+            newvar = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            where.append([llvmEnum.Load, newvar, 'ptr', '%.return'])
+            where.append([llvmEnum.Return, 'ptr', newvar])
         elif typetodo.type == typeEnum.CLASS:
-            where.append([llvmEnum.Return, 'ptr', 'null'])
+            newvar = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            where.append([llvmEnum.Load, newvar, 'ptr', '%.return'])
+            where.append([llvmEnum.Return, 'ptr', newvar])
         elif typetodo.type == typeEnum.STRING:
-            where.append([llvmEnum.Return, 'ptr', 'null'])
+            newvar = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            where.append([llvmEnum.Load, newvar, 'ptr', '%.return'])
+            where.append([llvmEnum.Return, 'ptr', newvar])
         elif typetodo.type == typeEnum.INT:
-            where.append([llvmEnum.Return, 'i32', '0'])
+            newvar = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            where.append([llvmEnum.Load, newvar, 'i32', '%.return'])
+            where.append([llvmEnum.Return, 'i32', newvar])
         elif typetodo.type == typeEnum.BOOL:
-            where.append([llvmEnum.Return, 'i1', '0'])
+            newvar = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            newvars = f"%._{self.Scopes[-1].tempvar}"
+            self.Scopes[-1].tempvar += 1
+            where.append([llvmEnum.Load, newvar, 'i32', '%.return'])
+            where.append([llvmEnum.Trunc, newvars, newvar])
+            where.append([llvmEnum.Return, 'i1', newvars])
         elif typetodo.type == typeEnum.VOID:
             where.append([llvmEnum.ReturnVoid])
         else:
@@ -2783,20 +2824,22 @@ declare ptr @malloc(i32)
         where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
         if node.cmd == 'Return':
             if node.returnExpr == ASTEmptyNode():
-                self.generateret(where, typeclass(t=typeEnum.VOID), None)
+                self.generatejump(where, 'return')
+                return
             elif type(node.returnExpr).__name__ == "ASTConstExprContextNode":
                 if node.returnExpr.type.type == typeEnum.STRING:
-                    newvar = f"@.string.{self.globalstring.index(node.returnExpr.value)}"
+                    retNode = f"@.string.{self.globalstring.index(node.returnExpr.value)}"
                 elif node.returnExpr.type.type == typeEnum.NULL:
-                    newvar = 'null'
+                    retNode = 'null'
                 else:
-                    newvar = str(int(node.returnExpr.value))
-                self.generateret(where, self.typeget(node.returnExpr)[0], newvar)
+                    retNode = str(int(node.returnExpr.value))
             else:
-                newvar = f"%._{self.Scopes[-1].tempvar}"
+                retNode = f"%._{self.Scopes[-1].tempvar}"
                 self.Scopes[-1].tempvar += 1
-                self.generateload(where, self.typeget(node.returnExpr)[0], node.returnExpr, newvar)
-                self.generateret(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], self.typeget(node.returnExpr)[0], newvar)
+                self.generateload(where, self.typeget(node.returnExpr)[0], node.returnExpr, retNode)
+            typetodo = self.typeget(node.returnExpr)[0]
+            self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append([llvmEnum.Store, self.llvmtypeclass(typetodo), retNode, "%.return"])
+            self.generatejump(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], 'return')
 
         else:
             for i in range(len(self.Scopes) - 1, -1, -1):
@@ -3567,7 +3610,6 @@ declare ptr @malloc(i32)
             if name in self.Scopes[i].VarsBank:
                 return self.Scopes[i].VarsBank[name]
 
-
 if __name__ == "__main__":
     # root = os.listdir(sys.argv[1])
     # for files in root:
@@ -3618,84 +3660,81 @@ if __name__ == "__main__":
 
     # sys.stdin = codecs.getreader('utf-8')(sys.stdin)
     # input_stream = StdinStream()
+    if sys.argv[1] == "-fsyntax-only":
+        sys.stdin = codecs.getreader('utf-8')(sys.stdin)
+        input_stream = StdinStream()
+        try:
+            lexer = helloLexer(input_stream)
+            lexer._listeners = [MyErrorListener()]
+            stream = CommonTokenStream(lexer)
+            parser = helloParser(stream)
+            parser._listeners = [MyErrorListener()]
+            cst = parser.body()
+            builder = ASTBuilder()
+            ast = builder.build(cst)
+            flag = builder.check(ast)
+        except Exception as e:
+            flag = False
+        if not flag:
+            sys.exit(-1)
 
-    # output = open('output.ll', 'w')
-    # input_stream = FileStream(r"C:\Users\14908\Desktop\PPCA\Complier\test.txt", encoding="utf-8")
-    # lexer = helloLexer(input_stream)
-    # lexer._listeners = [MyErrorListener()]
-    # stream = CommonTokenStream(lexer)
-    # parser = helloParser(stream)
-    # parser._listeners = [MyErrorListener()]
-    # cst = parser.body()
-    # builder = ASTBuilder()
-    # ast = builder.build(cst)
-    # flag = builder.check(ast)
-    # print(flag)
-    # builder.llvm(ast)
-    # output.close()
-    # commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Complier && clang-15 -m32 builtin.ll output.ll -o test && llc-15 -march=riscv32 output.ll -o test.s -O0"'
-    # input_data, output_data, exitcode = extract_input_output_exitcode(r"C:\Users\14908\Desktop\PPCA\Complier\test.txt")
-    # process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
-    # stdout, _ = process.communicate(input=input_data)
-    # print(stdout.strip(), process.returncode)
-
-    root = os.listdir(sys.argv[1])
-    for files in root:
-        if files[-3:] == '.mx' or files[-3:] == '.mt':
-            input_data, output_data, exitcode = extract_input_output_exitcode(sys.argv[1] + '\\' + files)
-            try:
-                print(files + ':', end='')
-                output = open('output.ll', 'w')
-                input_stream = FileStream(sys.argv[1] + '\\' + files, encoding="utf-8")
-                lexer = helloLexer(input_stream)
-                lexer._listeners = [MyErrorListener()]
-                stream = CommonTokenStream(lexer)
-                parser = helloParser(stream)
-                parser._listeners = [MyErrorListener()]
-                cst = parser.body()
-                builder = ASTBuilder()
-                ast = builder.build(cst)
-                flag = builder.check(ast)
-                builder.llvm(ast)
-                output.flush()
-                commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Complier && clang-15 -m32 builtin.ll output.ll -o test && ./test"'
-                process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
-                stdout, _ = process.communicate(input=input_data)
-                print(stdout.strip() == output_data, process.returncode == int(exitcode.strip()))
-            except Exception as e:
-                flag = False
-        elif files[-3:] == 'txt':
-            continue
-        elif files[-3:] == 'cpp':
-            continue
-        elif files[-2:] == '.c':
-            continue
-        elif files[-3:] == 'csv':
-            continue
-        elif files[-3:] == '.py':
-            continue
-        else:
-            subfile = os.listdir(sys.argv[1] + '\\' + files)
-            for file in subfile:
-                input_data, output_data, exitcode = extract_input_output_exitcode(sys.argv[1] + '\\' + files + '\\' + file)
-                try:
-                    print(file + ':', end='')
-                    output = open('output.ll', 'w')
-                    input_stream = FileStream(sys.argv[1] + '\\' + files + '\\' + file, encoding="utf-8")
-                    lexer = helloLexer(input_stream)
-                    lexer._listeners = [MyErrorListener()]
-                    stream = CommonTokenStream(lexer)
-                    parser = helloParser(stream)
-                    parser._listeners = [MyErrorListener()]
-                    cst = parser.body()
-                    builder = ASTBuilder()
-                    ast = builder.build(cst)
-                    flag = builder.check(ast)
-                    builder.llvm(ast)
-                    output.flush()
-                    commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Complier && clang-15 -m32 builtin.ll output.ll -o test && ./test"'
-                    process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
-                    stdout, _ = process.communicate(input=input_data)
-                    print(stdout.strip() == output_data, process.returncode == int(exitcode.strip()))
-                except Exception as e:
-                    flag = False
+    # root = os.listdir(sys.argv[1])
+    # for files in root:
+    #     if files[-3:] == '.mx' or files[-3:] == '.mt':
+    #         input_data, output_data, exitcode = extract_input_output_exitcode(sys.argv[1] + '\\' + files)
+    #         try:
+    #             print(files + ':', end='')
+    #             output = open('output.ll', 'w')
+    #             input_stream = FileStream(sys.argv[1] + '\\' + files, encoding="utf-8")
+    #             lexer = helloLexer(input_stream)
+    #             lexer._listeners = [MyErrorListener()]
+    #             stream = CommonTokenStream(lexer)
+    #             parser = helloParser(stream)
+    #             parser._listeners = [MyErrorListener()]
+    #             cst = parser.body()
+    #             builder = ASTBuilder()
+    #             ast = builder.build(cst)
+    #             flag = builder.check(ast)
+    #             builder.llvm(ast)
+    #             output.flush()
+    #             commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Complier && clang-15 -m32 builtin.ll output.ll -o test && ./test"'
+    #             process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
+    #             stdout, _ = process.communicate(input=input_data)
+    #             print(stdout.strip() == output_data, process.returncode == int(exitcode.strip()))
+    #         except Exception as e:
+    #             flag = False
+    #     elif files[-3:] == 'txt':
+    #         continue
+    #     elif files[-3:] == 'cpp':
+    #         continue
+    #     elif files[-2:] == '.c':
+    #         continue
+    #     elif files[-3:] == 'csv':
+    #         continue
+    #     elif files[-3:] == '.py':
+    #         continue
+    #     else:
+    #         subfile = os.listdir(sys.argv[1] + '\\' + files)
+    #         for file in subfile:
+    #             input_data, output_data, exitcode = extract_input_output_exitcode(sys.argv[1] + '\\' + files + '\\' + file)
+    #             try:
+    #                 print(file + ':', end='')
+    #                 output = open('output.ll', 'w')
+    #                 input_stream = FileStream(sys.argv[1] + '\\' + files + '\\' + file, encoding="utf-8")
+    #                 lexer = helloLexer(input_stream)
+    #                 lexer._listeners = [MyErrorListener()]
+    #                 stream = CommonTokenStream(lexer)
+    #                 parser = helloParser(stream)
+    #                 parser._listeners = [MyErrorListener()]
+    #                 cst = parser.body()
+    #                 builder = ASTBuilder()
+    #                 ast = builder.build(cst)
+    #                 flag = builder.check(ast)
+    #                 builder.llvm(ast)
+    #                 output.flush()
+    #                 commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Complier && clang-15 -m32 builtin.ll output.ll -o test && ./test"'
+    #                 process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
+    #                 stdout, _ = process.communicate(input=input_data)
+    #                 print(stdout.strip() == output_data, process.returncode == int(exitcode.strip()))
+    #             except Exception as e:
+    #                 flag = False
