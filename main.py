@@ -3664,7 +3664,7 @@ if __name__ == "__main__":
     # input_stream = StdinStream()
     if sys.argv[1] == "-fsyntax-only":
         sys.stdin = codecs.getreader('utf-8')(sys.stdin)
-        input_stream = StdinStream()
+        input_stream = StdinStream(encoding='utf-8')
         try:
             lexer = helloLexer(input_stream)
             lexer._listeners = [MyErrorListener()]
