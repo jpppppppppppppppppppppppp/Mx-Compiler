@@ -1,0 +1,14 @@
+sudo: true
+language: cpp
+dist: bionic
+
+compiler:
+  - clang
+  - gcc
+os:
+  - linux
+
+script:
+  - mkdir build
+  - cd build
+  - cmake .. && make

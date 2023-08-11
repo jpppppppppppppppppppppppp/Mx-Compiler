@@ -1,0 +1,13 @@
+.idea/
+cmake-build-*/
+cmake-arm/
+.DS_Store
+build/
+test.s
+builtin.s
+builtin.c
+test.c
+test.in
+test.out
+test.ll
+a.out
