@@ -1,3 +1,5 @@
 #!/bin/bash
 
-cp main.py py_parser bin/
+mkdir bin/
+cp -r main.py py_parser bin/
+mv bin/main.py bin/mxc
