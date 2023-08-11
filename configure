@@ -1,0 +1,3 @@
+#!/bin/bash
+
+cp main.py py_parser bin/
