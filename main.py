@@ -11,6 +11,8 @@ from antlr4.error.ErrorListener import ErrorListener
 import subprocess
 import re
 import codecs
+from RISCV import *
+
 
 def extract_input_output_exitcode(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
@@ -610,6 +612,9 @@ class llvmEnum(Enum):
     FuncCall = 18
     FuncVoid = 19
 
+    def __eq__(self, other):
+        return self.value == other.value
+
 
 def llvmstring(node):
     if node[0] == llvmEnum.Alloca:
@@ -714,6 +719,7 @@ class ASTBuilder:
         self.initnum = 0
         self.classScope = []
         self.FunctionScope = []
+        self.translator = RISCV('test.s')
 
     def build(self, node):
         if not isinstance(node, ParserRuleContext):
@@ -1736,6 +1742,7 @@ declare ptr @malloc(i32)
                 self.llvm(smt)
             self.generatejump(self.llvmfunc[funcname][2][self.Scopes[-1].dim], 'return')
             self.generatedefaultret(self.llvmfunc[funcname][2][1], node.ConstructFunc.retType)
+            self.llvmfunc[funcname].append(self.Scopes[-1].tempvar)
             self.Scopes.pop()
             self.NameSpace.pop()
         for func in node.FunctionMember:
@@ -1749,10 +1756,10 @@ declare ptr @malloc(i32)
             if func.retType != typeclass(t=typeEnum.VOID):
                 if func.retType == typeclass(t=typeEnum.BOOL):
                     self.llvmfunc[funcname][2][0].append([llvmEnum.Alloca, '%.return', 'i32'])
-                    self.llvmfunc[funcname][2][0].append([llvmEnum.Store, 'i32', 0, '%.return'])
+                    self.llvmfunc[funcname][2][0].append([llvmEnum.Store, 'i32', '0', '%.return'])
                 elif func.retType == typeclass(t=typeEnum.INT):
                     self.llvmfunc[funcname][2][0].append([llvmEnum.Alloca, '%.return', 'i32'])
-                    self.llvmfunc[funcname][2][0].append([llvmEnum.Store, 'i32', 0, '%.return'])
+                    self.llvmfunc[funcname][2][0].append([llvmEnum.Store, 'i32', '0', '%.return'])
                 else:
                     self.llvmfunc[funcname][2][0].append([llvmEnum.Alloca, '%.return', 'ptr'])
                     self.llvmfunc[funcname][2][0].append([llvmEnum.Store, 'ptr', 'null', '%.return'])
@@ -1782,6 +1789,7 @@ declare ptr @malloc(i32)
                 self.llvm(smt)
             self.generatejump(self.llvmfunc[funcname][2][self.Scopes[-1].dim], 'return')
             self.generatedefaultret(self.llvmfunc[funcname][2][1], func.retType)
+            self.llvmfunc[funcname].append(self.Scopes[-1].tempvar)
             self.Scopes.pop()
             self.NameSpace.pop()
         self.Scopes.pop()
@@ -1803,10 +1811,10 @@ declare ptr @malloc(i32)
         if node.retType != typeclass(t=typeEnum.VOID):
             if node.retType == typeclass(t=typeEnum.BOOL):
                 self.llvmfunc[funcname][2][0].append([llvmEnum.Alloca, '%.return', 'i32'])
-                self.llvmfunc[funcname][2][0].append([llvmEnum.Store, 'i32', 0, '%.return'])
+                self.llvmfunc[funcname][2][0].append([llvmEnum.Store, 'i32', '0', '%.return'])
             elif node.retType == typeclass(t=typeEnum.INT):
                 self.llvmfunc[funcname][2][0].append([llvmEnum.Alloca, '%.return', 'i32'])
-                self.llvmfunc[funcname][2][0].append([llvmEnum.Store, 'i32', 0, '%.return'])
+                self.llvmfunc[funcname][2][0].append([llvmEnum.Store, 'i32', '0', '%.return'])
             else:
                 self.llvmfunc[funcname][2][0].append([llvmEnum.Alloca, '%.return', 'ptr'])
                 self.llvmfunc[funcname][2][0].append([llvmEnum.Store, 'ptr', 'null', '%.return'])
@@ -1828,6 +1836,7 @@ declare ptr @malloc(i32)
             self.llvm(smt)
         self.generatejump(self.llvmfunc[funcname][2][self.Scopes[-1].dim], 'return')
         self.generatedefaultret(self.llvmfunc[funcname][2][1], node.retType)
+        self.llvmfunc[funcname].append(self.Scopes[-1].tempvar)
         self.Scopes.pop()
         self.NameSpace.pop()
 
@@ -1928,6 +1937,7 @@ declare ptr @malloc(i32)
             self.generateload(self.llvmfunc[funcname][2][self.Scopes[-1].dim], typetodo, init.expr, newvar)
             self.generatestore(self.llvmfunc[funcname][2][self.Scopes[-1].dim], typeclass(t=typeEnum.INT), init.id, newvar)
             self.generateret(self.llvmfunc[funcname][2][self.Scopes[-1].dim], typeclass(t=typeEnum.VOID), None)
+            self.llvmfunc[funcname].append(self.Scopes[-1].tempvar)
             self.Scopes.pop()
             self.NameSpace.pop()
         else:
@@ -2131,6 +2141,7 @@ declare ptr @malloc(i32)
                 self.generateFuncCall(self.llvmfunc[funcname][2][0], None, '-', [newvar, '1'], newvars)
             self.generatestore(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.INT), bodyptr, newvars)
             self.generateret(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.VOID), ASTEmptyNode())
+            self.llvmfunc[funcname].append(self.Scopes[-1].tempvar)
             self.Scopes.pop()
             self.NameSpace.pop()
         else:
@@ -2179,6 +2190,7 @@ declare ptr @malloc(i32)
             self.generatestore(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.INT), bodyptr, newvars)
             self.generatestore(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.INT), init.id, newvars)
             self.generateret(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.VOID), ASTEmptyNode())
+            self.llvmfunc[funcname].append(self.Scopes[-1].tempvar)
             self.Scopes.pop()
             self.NameSpace.pop()
         else:
@@ -2263,6 +2275,7 @@ declare ptr @malloc(i32)
                 self.llvmfunc[funcname] = ['void', [], [[[llvmEnum.Label, 'entry']]]]
                 self.generatestore(self.llvmfunc[funcname][2][0], typetodo, init.id, init.expr)
                 self.generateret(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.VOID), ASTEmptyNode())
+                self.llvmfunc[funcname].append(self.Scopes[-1].tempvar)
                 self.Scopes.pop()
                 self.NameSpace.pop()
             elif typetodo.type in [typeEnum.STRING, typeEnum.CLASS]:
@@ -2278,6 +2291,7 @@ declare ptr @malloc(i32)
                 self.llvmfunc[funcname] = ['void', [], [[[llvmEnum.Label, 'entry']]]]
                 self.generatestore(self.llvmfunc[funcname][2][0], typetodo, init.id, init.expr)
                 self.generateret(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.VOID), ASTEmptyNode())
+                self.llvmfunc[funcname].append(self.Scopes[-1].tempvar)
                 self.Scopes.pop()
                 self.NameSpace.pop()
         else:
@@ -2323,6 +2337,7 @@ declare ptr @malloc(i32)
                 self.generateload(where, typetodo, varname, newvar)
                 self.generateFuncCall(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.VOID), f".CLASS.{typetodo.name}.{typetodo.name}", [newvar], None)
             self.generateret(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.VOID), ASTEmptyNode())
+            self.llvmfunc[funcname].append(self.Scopes[-1].tempvar)
             self.Scopes.pop()
             self.NameSpace.pop()
         else:
@@ -2537,6 +2552,7 @@ declare ptr @malloc(i32)
             root = self.llvmfunc[funcname][2]
             self.generatenewarray(root, init.expr.dims, 0, typetodo.dim, typetodo, varname)
             self.generateret(self.llvmfunc[funcname][2][self.Scopes[-1].dim], typeclass(t=typeEnum.VOID), None)
+            self.llvmfunc[funcname].append(self.Scopes[-1].tempvar)
             self.Scopes.pop()
             self.NameSpace.pop()
         else:
@@ -2610,6 +2626,7 @@ declare ptr @malloc(i32)
             self.generateload(where, self.typeget(init.expr)[0], newvars, newvar)
             self.generatestore(self.llvmfunc[funcname][2][0], typetodo, init.id, newvar)
             self.generateret(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.VOID), ASTEmptyNode())
+            self.llvmfunc[funcname].append(self.Scopes[-1].tempvar)
             self.Scopes.pop()
             self.NameSpace.pop()
         else:
@@ -2655,6 +2672,7 @@ declare ptr @malloc(i32)
             self.generateload(self.llvmfunc[funcname][2][0], typetodo, init.expr, var)
             self.generatestore(self.llvmfunc[funcname][2][self.Scopes[-1].dim], typetodo, init.id, var)
             self.generateret(self.llvmfunc[funcname][2][self.Scopes[-1].dim], typeclass(t=typeEnum.VOID), ASTEmptyNode())
+            self.llvmfunc[funcname].append(self.Scopes[-1].tempvar)
             self.Scopes.pop()
             self.NameSpace.pop()
         else:
@@ -2712,6 +2730,7 @@ declare ptr @malloc(i32)
                 self.generateFuncCall(self.llvmfunc[funcname][2][0], None, '!', [newvar, 'true'], var)
                 self.generatestore(self.llvmfunc[funcname][2][0], typetodo, init.id, var)
             self.generateret(self.llvmfunc[funcname][2][0], typeclass(t=typeEnum.VOID), ASTEmptyNode())
+            self.llvmfunc[funcname].append(self.Scopes[-1].tempvar)
             self.Scopes.pop()
             self.NameSpace.pop()
         else:
@@ -3036,6 +3055,10 @@ declare ptr @malloc(i32)
                 else:
                     self.llvm(node.Smt)
                 self.generatejump(root[self.Scopes[-1].dim], bodySmt)
+                self.Scopes[-2].dim = endSmtind
+                self.Scopes[-2].tempvar = self.Scopes[-1].tempvar
+                self.Scopes.pop()
+                self.NameSpace.pop()
         else:
             condSmtind = len(root)
             condSmt = f"whilecondSmt.{len(root)}"
@@ -3612,6 +3635,14 @@ declare ptr @malloc(i32)
             if name in self.Scopes[i].VarsBank:
                 return self.Scopes[i].VarsBank[name]
 
+    def riscv(self):
+        for smt in self.globalvars:
+            self.translator.translateglobalvars(smt)
+        for func in self.llvmfunc:
+            self.translator.translatefunction(func, self.llvmfunc[func])
+        self.translator.write()
+
+
 if __name__ == "__main__":
     # root = os.listdir(sys.argv[1])
     # for files in root:
@@ -3660,25 +3691,23 @@ if __name__ == "__main__":
     #             f5.close()
     #             print(('Verdict: Success\n' in content) == flag)
 
-    # sys.stdin = codecs.getreader('utf-8')(sys.stdin)
-    # input_stream = StdinStream()
-    if sys.argv[1] == "-fsyntax-only":
-        sys.stdin = codecs.getreader('utf-8')(sys.stdin)
-        input_stream = StdinStream(encoding='utf-8')
-        try:
-            lexer = helloLexer(input_stream)
-            lexer._listeners = [MyErrorListener()]
-            stream = CommonTokenStream(lexer)
-            parser = helloParser(stream)
-            parser._listeners = [MyErrorListener()]
-            cst = parser.body()
-            builder = ASTBuilder()
-            ast = builder.build(cst)
-            flag = builder.check(ast)
-        except Exception as e:
-            flag = False
-        if not flag:
-            sys.exit(-1)
+    # if sys.argv[1] == "-fsyntax-only":
+    #     sys.stdin = codecs.getreader('utf-8')(sys.stdin)
+    #     input_stream = StdinStream(encoding='utf-8')
+    #     try:
+    #         lexer = helloLexer(input_stream)
+    #         lexer._listeners = [MyErrorListener()]
+    #         stream = CommonTokenStream(lexer)
+    #         parser = helloParser(stream)
+    #         parser._listeners = [MyErrorListener()]
+    #         cst = parser.body()
+    #         builder = ASTBuilder()
+    #         ast = builder.build(cst)
+    #         flag = builder.check(ast)
+    #     except Exception as e:
+    #         flag = False
+    #     if not flag:
+    #         sys.exit(-1)
 
     # root = os.listdir(sys.argv[1])
     # for files in root:
@@ -3699,7 +3728,7 @@ if __name__ == "__main__":
     #             flag = builder.check(ast)
     #             builder.llvm(ast)
     #             output.flush()
-    #             commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Complier && clang-15 -m32 builtin.ll output.ll -o test && ./test"'
+    #             commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && clang-15 -m32 builtin.ll output.ll -o test && ./test"'
     #             process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
     #             stdout, _ = process.communicate(input=input_data)
     #             print(stdout.strip() == output_data, process.returncode == int(exitcode.strip()))
@@ -3734,9 +3763,31 @@ if __name__ == "__main__":
     #                 flag = builder.check(ast)
     #                 builder.llvm(ast)
     #                 output.flush()
-    #                 commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Complier && clang-15 -m32 builtin.ll output.ll -o test && ./test"'
+    #                 commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && clang-15 -m32 builtin.ll output.ll -o test && ./test"'
     #                 process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
     #                 stdout, _ = process.communicate(input=input_data)
     #                 print(stdout.strip() == output_data, process.returncode == int(exitcode.strip()))
     #             except Exception as e:
     #                 flag = False
+
+    output = open('output.ll', 'w')
+    input_stream = FileStream(r"C:\Users\14908\Desktop\PPCA\Compiler\test.txt", encoding="utf-8")
+    lexer = helloLexer(input_stream)
+    lexer._listeners = [MyErrorListener()]
+    stream = CommonTokenStream(lexer)
+    parser = helloParser(stream)
+    parser._listeners = [MyErrorListener()]
+    cst = parser.body()
+    builder = ASTBuilder()
+    ast = builder.build(cst)
+    flag = builder.check(ast)
+    print(flag)
+    builder.llvm(ast)
+    output.close()
+    builder.riscv()
+
+    commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && clang-15 -m32 builtin.ll output.ll -o test && llc-15 -march=riscv32 output.ll -o std.s -O0"'
+    input_data, output_data, exitcode = extract_input_output_exitcode(r"C:\Users\14908\Desktop\PPCA\Compiler\test.txt")
+    process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
+    stdout, _ = process.communicate(input=input_data)
+    print(stdout.strip(), process.returncode)
