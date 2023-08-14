@@ -854,6 +854,11 @@ class ASTBuilder:
                     return ASTConstExprContextNode(t=typeclass(t=typeEnum.BOOL), v=res.lhs.value & res.rhs.value)
                 if res.op == '||':
                     return ASTConstExprContextNode(t=typeclass(t=typeEnum.BOOL), v=res.lhs.value | res.rhs.value)
+            elif res.lhs.type.type == typeEnum.NULL and res.rhs.type.type == typeEnum.NULL:
+                return ASTConstExprContextNode(t=typeclass(t=typeEnum.BOOL), v=int(res.op == '=='))
+        if type(res.lhs).__name__ == "ASTIdentifierExprNode" and type(res.rhs).__name__ == "ASTIdentifierExprNode":
+            if res.op in ['==', '!='] and (res.lhs.id == res.rhs.id):
+                return ASTConstExprContextNode(t=typeclass(t=typeEnum.BOOL), v=int((res.op == '==')))
         return res
 
     def buildAssignExprContext(self, node):
@@ -1888,6 +1893,7 @@ declare ptr @malloc(i32)
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
+            self.Scopes[-1].tempvar += 1
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.NameSpace[-1].VarsBank[varname] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
@@ -1906,6 +1912,7 @@ declare ptr @malloc(i32)
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
+            self.Scopes[-1].tempvar += 1
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.NameSpace[-1].VarsBank[varname] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
@@ -1943,6 +1950,7 @@ declare ptr @malloc(i32)
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
+            self.Scopes[-1].tempvar += 1
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.NameSpace[-1].VarsBank[varname] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
@@ -1978,6 +1986,7 @@ declare ptr @malloc(i32)
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
+            self.Scopes[-1].tempvar += 1
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.NameSpace[-1].VarsBank[varname] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
@@ -2147,6 +2156,7 @@ declare ptr @malloc(i32)
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
+            self.Scopes[-1].tempvar += 1
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.NameSpace[-1].VarsBank[varname] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
@@ -2196,6 +2206,7 @@ declare ptr @malloc(i32)
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
+            self.Scopes[-1].tempvar += 1
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.NameSpace[-1].VarsBank[varname] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
@@ -2244,12 +2255,14 @@ declare ptr @malloc(i32)
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
+            self.Scopes[-1].tempvar += 1
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.NameSpace[-1].VarsBank[varname] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
             self.Scopes[-1].VarsBank[varname] = typetodo
             if typetodo.dim > 0:
                 self.generatealloca(where, typetodo, varname)
+                self.generatestore(where, typetodo, init.id, f"null")
             elif typetodo.type in [typeEnum.INT, typeEnum.BOOL]:
                 self.generatealloca(where, typetodo, varname)
                 self.generatestore(where, typetodo, init.id, '0')
@@ -2297,6 +2310,7 @@ declare ptr @malloc(i32)
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
+            self.Scopes[-1].tempvar += 1
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.NameSpace[-1].VarsBank[varname] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
@@ -2343,6 +2357,7 @@ declare ptr @malloc(i32)
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
+            self.Scopes[-1].tempvar += 1
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.NameSpace[-1].VarsBank[varname] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
@@ -2558,6 +2573,7 @@ declare ptr @malloc(i32)
         else:
             root = self.llvmfunc[self.getfuncname()][2]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
+            self.Scopes[-1].tempvar += 1
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.NameSpace[-1].VarsBank[varname] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
@@ -2571,6 +2587,7 @@ declare ptr @malloc(i32)
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
+            self.Scopes[-1].tempvar += 1
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.NameSpace[-1].VarsBank[varname] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
@@ -2632,6 +2649,7 @@ declare ptr @malloc(i32)
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
+            self.Scopes[-1].tempvar += 1
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.NameSpace[-1].VarsBank[varname] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
@@ -2678,6 +2696,7 @@ declare ptr @malloc(i32)
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
+            self.Scopes[-1].tempvar += 1
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.NameSpace[-1].VarsBank[varname] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
@@ -2736,6 +2755,7 @@ declare ptr @malloc(i32)
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
+            self.Scopes[-1].tempvar += 1
             self.NameSpace[-1].VarsBank[init.id] = varname
             self.NameSpace[-1].VarsBank[varname] = varname
             self.Scopes[-1].VarsBank[init.id] = typetodo
@@ -2787,17 +2807,17 @@ declare ptr @malloc(i32)
 
     def llvmASTPrefixUpdateExprNode(self, node):
         where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
-        bodytpr = self.getelementptr(node.body)
+        bodyptr = self.getelementptr(node.body)
         newvar = f"%._{self.Scopes[-1].tempvar}"
         self.Scopes[-1].tempvar += 1
-        self.generateload(where, typeclass(t=typeEnum.INT), bodytpr, newvar)
+        self.generateload(where, typeclass(t=typeEnum.INT), bodyptr, newvar)
         newvars = f"%._{self.Scopes[-1].tempvar}"
         self.Scopes[-1].tempvar += 1
         if node.op == '++':
             self.generateFuncCall(where, None, '+', [newvar, '1'], newvars)
         else:
             self.generateFuncCall(where, None, '-', [newvar, '1'], newvars)
-        self.generatestore(where, typeclass(t=typeEnum.INT), bodytpr, newvars)
+        self.generatestore(where, typeclass(t=typeEnum.INT), bodyptr, newvars)
 
     def llvmASTTriExprNode(self, node):
         convar = f"%._{self.Scopes[-1].tempvar}"
@@ -3636,6 +3656,10 @@ declare ptr @malloc(i32)
                 return self.Scopes[i].VarsBank[name]
 
     def riscv(self):
+        maxarg = 0
+        for func in self.llvmfunc:
+            maxarg = max(maxarg, len(self.llvmfunc[func][1]) - 8)
+        self.translator.Maxarg = maxarg
         for smt in self.globalvars:
             self.translator.translateglobalvars(smt)
         for func in self.llvmfunc:
@@ -3785,9 +3809,11 @@ if __name__ == "__main__":
     builder.llvm(ast)
     output.close()
     builder.riscv()
-
-    commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && clang-15 -m32 builtin.ll output.ll -o test && llc-15 -march=riscv32 output.ll -o std.s -O0"'
     input_data, output_data, exitcode = extract_input_output_exitcode(r"C:\Users\14908\Desktop\PPCA\Compiler\test.txt")
+    temp = open('test.in', 'w')
+    temp.write(input_data)
+    temp.flush()
+    commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && clang-15 -m32 builtin.ll output.ll -o test && llc-15 -march=riscv32 output.ll -o std.s -O0 && ./ravel_test --input-file=test.in --output-file=test.out test.s builtin.s"'
     process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
-    stdout, _ = process.communicate(input=input_data)
+    stdout, _ = process.communicate()
     print(stdout.strip(), process.returncode)
