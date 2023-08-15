@@ -23,7 +23,39 @@ class Regtrival:
             raise Exception("Warning")
 
     def var2Reg(self, array, var):
-        if var.isdigit():
+        if var.isdigit() or var[1:].isdigit():
+            reg = self.Regtouse.pop(0)
+            array.append(f'\tli\t{reg}, {var}\n')
+            return reg, [reg]
+        elif var[0] == '%':
+            if var in self.Vars2Reg:
+                return self.Vars2Reg[var], []
+            else:
+                addr, _ = self.var2Addr(array, var)
+                reg = self.Regtouse.pop(0)
+                array.append(f'\tlw\t{reg}, {addr}\n')
+                return reg, [reg]
+        elif var[0] == '@':
+            reg = self.Regtouse.pop(0)
+            array.append(f'\tlui\t{reg}, %hi({var[1:]})\n')
+            array.append(f'\taddi\t{reg}, {reg}, %lo({var[1:]})\n')
+            return reg, [reg]
+        elif var == 'null':
+            return 'x0', []
+        elif var == 'true':
+            reg = self.Regtouse.pop(0)
+            array.append(f'\tli\t{reg}, 1\n')
+            return reg, [reg]
+        elif var == 'false':
+            reg = self.Regtouse.pop(0)
+            array.append(f'\tli\t{reg}, 0\n')
+            return reg, [reg]
+        else:
+            raise Exception("Warning")
+        return None, []
+
+    def var2varReg(self, array, var):
+        if var.isdigit() or var[1:].isdigit():
             reg = self.Regtouse.pop(0)
             array.append(f'\tli\t{reg}, {var}\n')
             return reg, [reg]
@@ -80,21 +112,34 @@ class Regtrival:
         self.used.clear()
 
     def load(self, array, var, reg):
-        if var.isdigit():
+        if var.isdigit() or var[1:].isdigit():
             if reg.isdigit():
                 array.append(f'\tli\t{self.Regtouse[0]}, {var}\n')
                 array.append(f'\tsw\t{self.Regtouse[0]}, {reg}(sp)\n')
             else:
                 array.append(f'\tli\t{reg}, {var}\n')
         elif var[0] == '%':
-            if var in self.Vars2Reg:
-                array.append(f'\tmv\t{reg}, {self.Vars2Reg[var]}\n')
+            if reg.isdigit():
+                if var in self.Vars2Reg:
+                    array.append(f'\tmv\t{self.Regtouse[0]}, {self.Vars2Reg[var]}\n')
+                else:
+                    addr, _ = self.var2Addr(array, var)
+                    array.append(f'\tlw\t{self.Regtouse[0]}, {addr}\n')
+                array.append(f'\tsw\t{self.Regtouse[0]}, {reg}(sp)\n')
             else:
-                addr, _ = self.var2Addr(array, var)
-                array.append(f'\tlw\t{reg}, {addr}\n')
+                if var in self.Vars2Reg:
+                    array.append(f'\tmv\t{reg}, {self.Vars2Reg[var]}\n')
+                else:
+                    addr, _ = self.var2Addr(array, var)
+                    array.append(f'\tlw\t{reg}, {addr}\n')
         elif var[0] == '@':
-            array.append(f'\tlui\t{reg}, %hi({var[1:]})\n')
-            array.append(f'\taddi\t{reg}, {reg}, %lo({var[1:]})\n')
+            if reg.isdigit():
+                array.append(f'\tlui\t{self.Regtouse[0]}, %hi({var[1:]})\n')
+                array.append(f'\taddi\t{self.Regtouse[0]}, {self.Regtouse[0]}, %lo({var[1:]})\n')
+                array.append(f'\tsw\t{self.Regtouse[0]}, {reg}(sp)\n')
+            else:
+                array.append(f'\tlui\t{reg}, %hi({var[1:]})\n')
+                array.append(f'\taddi\t{reg}, {reg}, %lo({var[1:]})\n')
         else:
             raise Exception("Warning")
 
@@ -105,12 +150,10 @@ class Regtrival:
 
     def GEP1(self, array, target, index, ans, clean):
         array.append(f"\tslli\t{index}, {index}, 2\n")
-        reg = self.Regtouse.pop(0)
-        array.append(f"\tadd\t{reg}, {target}, {index}\n")
-        self.Vars2addr[ans] = f'0({reg})'
+        array.append(f"\tadd\ts1, {target}, {index}\n")
+        self.Vars2addr[ans] = f'0(s1)'
         for toclean in clean:
             self.Regtouse.append(toclean)
-        self.used.append(reg)
 
     def Icmp(self, array, op, lhs, rhs, ans, clean):
         reg = self.Regtouse[0]
@@ -228,7 +271,7 @@ class RISCV:
         elif smt[0] == llvmEnum.Load:
             temp = []
             self.Reg.alloca(smt[1])
-            varReg, clean = self.Reg.var2Reg(self.func[-1], smt[3])
+            varReg, clean = self.Reg.var2varReg(self.func[-1], smt[3])
             for toclear in clean:
                 temp.append(toclear)
             taraddr, clean = self.Reg.var2Addr(self.func[-1], smt[1])
@@ -299,6 +342,15 @@ class RISCV:
             for toclear in clean:
                 temp.append(toclear)
             self.Reg.GEP1(self.func[-1], tarReg, indReg, smt[1], temp)
+        elif smt[0] == llvmEnum.Getelementptr2:
+            temp = []
+            tarReg, clean = self.Reg.var2Reg(self.func[-1], smt[3])
+            for toclear in clean:
+                temp.append(toclear)
+            indReg, clean = self.Reg.var2Reg(self.func[-1], smt[4])
+            for toclear in clean:
+                temp.append(toclear)
+            self.Reg.GEP1(self.func[-1], tarReg, indReg, smt[1], temp)
         elif smt[0] == llvmEnum.Icmp:
             temp = []
             varReg1, clean = self.Reg.var2Reg(self.func[-1], smt[4])
@@ -355,6 +407,8 @@ class RISCV:
             self.end = True
         elif smt[0] == llvmEnum.Phi:
             self.Reg.alloca(smt[1])
+            if self.label not in self.phiaddr:
+                self.phiaddr[self.label] = str(self.Reg.Unused.pop(0) + self.pc) + '(sp)'
             taraddr = self.phiaddr[self.label]
             reg = self.Reg.Regtouse[0]
             self.func[-1].append(f"\tlw\t{reg}, {taraddr}\n")

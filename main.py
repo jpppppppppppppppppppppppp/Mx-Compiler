@@ -36,7 +36,14 @@ def extract_input_output_exitcode(file_path):
     else:
         exitcode = ""
     return input_data, output_data, exitcode
-
+def extract_exitcode_time(content):
+    exitcode_regex = r'exit code: (.*?)\n'
+    time_regex = r'time: (.*?)\n'
+    exitcode_match = re.search(exitcode_regex, content)
+    time_match = re.search(time_regex, content)
+    exitcode = exitcode_match.group(1).strip()
+    time = time_match.group(1).strip()
+    return exitcode, time
 
 def getstring(str):
     res = ""
@@ -1592,7 +1599,7 @@ class ASTBuilder:
             if name != 'int' and name != 'string':
                 self.llvm(classscope)
         for i in range(len(self.globalstring)):
-            self.globalvars.append([llvmEnum.GlobalString, i, getstringlength(self.globalstring[i]) + 1, getstring(self.globalstring[i])])
+            self.globalvars.append([llvmEnum.GlobalString, i, getstringlength(self.globalstring[i]) + 1, self.globalstring[i][1:-1]])
         for func in self.FuncBank:
             if func not in self.allfunc:
                 self.allfunc[func] = []
@@ -2012,7 +2019,7 @@ declare ptr @malloc(i32)
                 newvars = f"%._{self.Scopes[-1].tempvar}"
                 self.Scopes[-1].tempvar += 1
                 where.append([llvmEnum.Load, newvars, 'ptr', '%.arg_this'])
-                where.append([llvmEnum.Getelementptr2, newvar, f'%.CLASS.{self.classScope[-1][node.id][1]}', newvars, self.classScope[-1][node.id][2]])
+                where.append([llvmEnum.Getelementptr2, newvar, f'%.CLASS.{self.classScope[-1][node.id][1]}', newvars, str(self.classScope[-1][node.id][2])])
                 return newvar
             return self.getname(node.id)
         elif type(node).__name__ == "ASTPrefixUpdateExprNode":
@@ -3152,7 +3159,7 @@ declare ptr @malloc(i32)
                 newvars = f"%._{self.Scopes[-1].tempvar}"
                 self.Scopes[-1].tempvar += 1
                 where.append([llvmEnum.Load, newvars, 'ptr', '%.arg_this'])
-                where.append([llvmEnum.Getelementptr2, newvar, f"%.CLASS.{self.classScope[-1][vars.id][1]}", newvars, self.classScope[-1][vars.id][2]])
+                where.append([llvmEnum.Getelementptr2, newvar, f"%.CLASS.{self.classScope[-1][vars.id][1]}", newvars, str(self.classScope[-1][vars.id][2])])
                 where.append([llvmEnum.Load, target, self.llvmtypeclass(typetodo), newvar])
                 return
             where.append([llvmEnum.Load, target, self.llvmtypeclass(typetodo), self.getname(vars.id)])
@@ -3545,7 +3552,7 @@ declare ptr @malloc(i32)
             else:
                 where.append([llvmEnum.Getelementptr1, newvar, 'ptr', target, id])
         else:
-            where.append([llvmEnum.Getelementptr2, newvar, f'%.CLASS.{typetodo.name}', target, self.llvmclass[typetodo.name].index(id)])
+            where.append([llvmEnum.Getelementptr2, newvar, f'%.CLASS.{typetodo.name}', target, str(self.llvmclass[typetodo.name].index(id))])
 
     def generatestore(self, where, typetodo, target, value):
         if type(value).__name__ == 'ASTIdentifierExprNode':
@@ -3794,26 +3801,105 @@ if __name__ == "__main__":
     #             except Exception as e:
     #                 flag = False
 
-    output = open('output.ll', 'w')
-    input_stream = FileStream(r"C:\Users\14908\Desktop\PPCA\Compiler\test.txt", encoding="utf-8")
-    lexer = helloLexer(input_stream)
-    lexer._listeners = [MyErrorListener()]
-    stream = CommonTokenStream(lexer)
-    parser = helloParser(stream)
-    parser._listeners = [MyErrorListener()]
-    cst = parser.body()
-    builder = ASTBuilder()
-    ast = builder.build(cst)
-    flag = builder.check(ast)
-    print(flag)
-    builder.llvm(ast)
-    output.close()
-    builder.riscv()
-    input_data, output_data, exitcode = extract_input_output_exitcode(r"C:\Users\14908\Desktop\PPCA\Compiler\test.txt")
-    temp = open('test.in', 'w')
-    temp.write(input_data)
-    temp.flush()
-    commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && clang-15 -m32 builtin.ll output.ll -o test && llc-15 -march=riscv32 output.ll -o std.s -O0 && ./ravel_test --input-file=test.in --output-file=test.out test.s builtin.s"'
-    process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
-    stdout, _ = process.communicate()
-    print(stdout.strip(), process.returncode)
+    # output = open('output.ll', 'w')
+    # input_stream = FileStream(r"C:\Users\14908\Desktop\PPCA\Compiler\test.txt", encoding="utf-8")
+    # lexer = helloLexer(input_stream)
+    # lexer._listeners = [MyErrorListener()]
+    # stream = CommonTokenStream(lexer)
+    # parser = helloParser(stream)
+    # parser._listeners = [MyErrorListener()]
+    # cst = parser.body()
+    # builder = ASTBuilder()
+    # ast = builder.build(cst)
+    # flag = builder.check(ast)
+    # print(flag)
+    # builder.llvm(ast)
+    # output.close()
+    # builder.riscv()
+    # input_data, output_data, exitcode = extract_input_output_exitcode(r"C:\Users\14908\Desktop\PPCA\Compiler\test.txt")
+    # temp = open('test.in', 'w')
+    # temp.write(input_data)
+    # temp.flush()
+    # commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && ./ravel_test --input-file=test.in --output-file=test.out test.s builtin.s"'
+    # process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
+    # stdout, _ = process.communicate()
+    # print(stdout.strip(), process.returncode)
+
+    root = os.listdir(sys.argv[1])
+    for files in root:
+        if files[-3:] == '.mx' or files[-3:] == '.mt':
+            input_data, output_data, exitcode = extract_input_output_exitcode(sys.argv[1] + '\\' + files)
+            temp = open('test.in', 'w')
+            temp.write(input_data)
+            temp.flush()
+            try:
+                print(files + ':', end='')
+                output = open('output.ll', 'w')
+                input_stream = FileStream(sys.argv[1] + '\\' + files, encoding="utf-8")
+                lexer = helloLexer(input_stream)
+                lexer._listeners = [MyErrorListener()]
+                stream = CommonTokenStream(lexer)
+                parser = helloParser(stream)
+                parser._listeners = [MyErrorListener()]
+                cst = parser.body()
+                builder = ASTBuilder()
+                ast = builder.build(cst)
+                flag = builder.check(ast)
+                builder.llvm(ast)
+                output.flush()
+                builder.riscv()
+                commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && ./ravel_test --input-file=test.in --output-file=test.out test.s builtin.s"'
+                process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
+                stdout, _ = process.communicate()
+                outfile = open('test.out', 'r')
+                content = outfile.read()
+                outfile.close()
+                content = content.strip()
+                ec, t = extract_exitcode_time(stdout)
+                print(content == output_data, int(ec) == int(exitcode.strip()), t)
+            except Exception as e:
+                flag = False
+        elif files[-3:] == 'txt':
+            continue
+        elif files[-3:] == 'cpp':
+            continue
+        elif files[-2:] == '.c':
+            continue
+        elif files[-3:] == 'csv':
+            continue
+        elif files[-3:] == '.py':
+            continue
+        else:
+            subfile = os.listdir(sys.argv[1] + '\\' + files)
+            for file in subfile:
+                input_data, output_data, exitcode = extract_input_output_exitcode(sys.argv[1] + '\\' + files + '\\' + file)
+                temp = open('test.in', 'w')
+                temp.write(input_data)
+                temp.flush()
+                try:
+                    print(file + ':', end='')
+                    output = open('output.ll', 'w')
+                    input_stream = FileStream(sys.argv[1] + '\\' + files + '\\' + file, encoding="utf-8")
+                    lexer = helloLexer(input_stream)
+                    lexer._listeners = [MyErrorListener()]
+                    stream = CommonTokenStream(lexer)
+                    parser = helloParser(stream)
+                    parser._listeners = [MyErrorListener()]
+                    cst = parser.body()
+                    builder = ASTBuilder()
+                    ast = builder.build(cst)
+                    flag = builder.check(ast)
+                    builder.llvm(ast)
+                    output.flush()
+                    builder.riscv()
+                    commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && ./ravel_test --input-file=test.in --output-file=test.out test.s builtin.s"'
+                    process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
+                    stdout, _ = process.communicate()
+                    outfile = open('test.out', 'r')
+                    content = outfile.read()
+                    outfile.close()
+                    content = content.strip()
+                    ec, t = extract_exitcode_time(stdout)
+                    print(content == output_data, int(ec) == int(exitcode.strip()), t)
+                except Exception as e:
+                    flag = False
