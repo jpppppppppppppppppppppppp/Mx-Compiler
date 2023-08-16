@@ -8,94 +8,93 @@ $?
 
 | testcase | output | exit code | simulate time |
 | :--: | :--: | :--: | :--: |
-|e1.mx|True|True|140135|
-|e10.mx|True|True|5829|
-|e2.mx|True|True|103815|
-|e3.mx|True|True|2757|
-|e4.mx|True|True|5667|
-|e5.mx|True|True|48001|
-|e6.mx|True|True|29070|
-|e7.mx|True|True|11205|
-|e8.mx|True|True|67977|
-|e9.mx|True|True|17953|
-|dijkstra.mx|True|True|6896882408|
-|floyd.mx|True|True|4845288277|
-|spfa.mx|True|True|4905789635|
-|bubble_sort.mx|True|True|26079028|
-|merge_sort.mx|True|True|100581679|
-|quick_sort.mx|True|True|4026642|
-|selection_sort.mx|True|True|14815249|
-|queue.mt|True|True|3340086|
-|t1.mx|True|True|999641467|
-|t10.mx|True|True|17047|
-|t11.mx|True|True|22122|
-|t12.mx|True|True|2507716|
-|t13.mx|True|True|4934|
-|t14.mx|True|True|34283|
-|t15.mx|True|True|69751666|
-|t16.mx|True|True|10844|
-|t17.mx|True|True|1389964989|
-|t18.mx|True|True|37005071|
-|t19.mx|True|True|159924|
-|t2.mx|True|True|100967733|
-|t20.mx|True|True|1344381122|
-|t21.mx|True|True|324986353|
-|t22.mx|True|True|378974|
-|t23.mx|True|True|11692811|
-|t24.mx|True|True|144635455|
-|t25.mx|True|True|140533690|
-|t26.mx|True|True|1348589150|
-|t27.mx|True|True|120589297|
-|t28.mx|True|True|17047|
-|t29.mx|True|True|17047|
-|t3.mx|True|True|1097798212|
-|t30.mx|True|True|137079896|
-|t31.mx|True|True|345811678|
-|t32.mx|True|True|3950161|
-|t33.mx|True|True|1743|
-|t34.mx|True|True|5360|
-|t35.mx|True|True|1879|
-|t36.mx|True|True|2977|
-|t37.mx|True|True|2592|
-|t38.mx|True|True|36504|
-|t39.mx|True|True|2652|
-|t4.mx|True|True|1263814893|
-|t40.mx|True|True|2265|
-|t41.mx|True|True|4794|
-|t42.mx|True|True|1558|
-|t43.mx|True|True|1367|
-|t44.mx|True|True|137075999|
-|t45.mx|True|True|2268|
-|t46.mx|True|True|55454|
-|t47.mx|True|True|4113|
-|t48.mx|True|True|714|
-|t49.mx|True|True|3297|
-|t5.mx|True|True|2254|
-|t50.mx|True|True|38801|
-|t51.mx|True|True|57384|
-|t52.mx|True|True|24811|
-|t53.mx|True|True|80567|
-|t54.mx|True|True|4690|
-|t55.mx|True|True|2470770|
-|t56.mx|True|True|127052|
-|t57.mx|True|True|75882712|
-|t58.mx|True|True|205061608172|
-|t59.mx|True|True|62530652714|
-|t6.mx|True|True|1612|
-|t60.mx|True|True|874348824|
-|t61.mx|True|True|753746|
-|t62.mx|True|True|1358|
-|t63.mx|True|True|237263|
-|t64.mx|True|True|4989927|
-|t66.mx|True|True|2008|
-|t67.mx|True|True|245114|
-|t68.mx|True|True|127736|
-|t69.mx|True|True|205133|
-|t7.mx|True|True|50773|
-|t70.mx|True|True|176884|
-|t71.mx|True|True|9410|
-|t72.mx|True|True|6049|
-|t73.mx|True|True|8072|
-|t8.mx|True|True|69108|
-|t9.mx|True|True|15961|
-
+|e1.mx|True | True | 136935 |
+|e10.mx|True | True | 5317 |
+|e2.mx|True | True | 103815 |
+|e3.mx|True | True | 2629 |
+|e4.mx|True | True | 5667 |
+|e5.mx|True | True | 48001 |
+|e6.mx|True | True | 28558 |
+|e7.mx|True | True | 11205 |
+|e8.mx|True | True | 67977 |
+|e9.mx|True | True | 17697 |
+|dijkstra.mx|True | True | 6858131432 |
+|floyd.mx|True | True | 4845288277 |
+|spfa.mx|True | True | 4905789635 |
+|bubble_sort.mx|True | True | 26079028 |
+|merge_sort.mx|True | True | 100389935 |
+|quick_sort.mx|True | True | 4026642 |
+|selection_sort.mx|True | True | 14815249 |
+|queue.mt|True | True | 3340086 |
+|t1.mx|True | True | 955881723 |
+|t10.mx|True | True | 17047 |
+|t11.mx|True | True | 22122 |
+|t12.mx|True | True | 2507716 |
+|t13.mx|True | True | 4934 |
+|t14.mx|True | True | 34283 |
+|t15.mx|True | True | 68983666 |
+|t16.mx|True | True | 10844 |
+|t17.mx|True | True | 1389964989 |
+|t18.mx|True | True | 37005071 |
+|t19.mx|True | True | 159924 |
+|t2.mx|True | True | 96943413 |
+|t20.mx|True | True | 1105502402 |
+|t21.mx|True | True | 324986353 |
+|t22.mx|True | True | 378974 |
+|t23.mx|True | True | 11692811 |
+|t24.mx|True | True | 139094591 |
+|t25.mx|True | True | 140309178 |
+|t26.mx|True | True | 1296431198 |
+|t27.mx|True | True | 120589297 |
+|t28.mx|True | True | 17047 |
+|t29.mx|True | True | 17047 |
+|t3.mx|True | True | 1053191108 |
+|t30.mx|True | True | 137079896 |
+|t31.mx|True | True | 345811678 |
+|t32.mx|True | True | 3947985 |
+|t33.mx|True | True | 1743 |
+|t34.mx|True | True | 5360 |
+|t35.mx|True | True | 1879 |
+|t36.mx|True | True | 2977 |
+|t37.mx|True | True | 2592 |
+|t38.mx|True | True | 36504 |
+|t39.mx|True | True | 2652 |
+|t4.mx|True | True | 1248036333 |
+|t40.mx|True | True | 2265 |
+|t41.mx|True | True | 4794 |
+|t42.mx|True | True | 1558 |
+|t43.mx|True | True | 1367 |
+|t44.mx|True | True | 137075999 |
+|t45.mx|True | True | 2268 |
+|t46.mx|True | True | 55454 |
+|t47.mx|True | True | 3729 |
+|t48.mx|True | True | 714 |
+|t49.mx|True | True | 3297 |
+|t5.mx|True | True | 2254 |
+|t50.mx|True | True | 38801 |
+|t51.mx|True | True | 57384 |
+|t52.mx|True | True | 24811 |
+|t53.mx|True | True | 80567 |
+|t54.mx|True | True | 4306 |
+|t55.mx|True | True | 2470770 |
+|t56.mx|True | True | 127052 |
+|t57.mx|True | True | 75882456 |
+|t58.mx|True | True | 205061608172 |
+|t59.mx|True | True | 62530652714 |
+|t6.mx|True | True | 1612 |
+|t60.mx|True | True | 874348824 |
+|t61.mx|True | True | 753618 |
+|t62.mx|True | True | 1358 |
+|t63.mx|True | True | 237263 |
+|t64.mx|True | True | 4989927 |
+|t66.mx|True | True | 2008 |
+|t67.mx|True | True | 245114 |
+|t68.mx|True | True | 126328 |
+|t69.mx|True | True | 202573 |
+|t7.mx|True | True | 50773 |
+|t70.mx|True | True | 174708 |
+|t71.mx|True | True | 9026 |
+|t72.mx|True | True | 5793 |
+|t73.mx|True | True | 8072 |
+|t8.mx|True | True | 69108 |
+|t9.mx|True | True | 15961 |

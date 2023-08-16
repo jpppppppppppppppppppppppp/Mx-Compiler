@@ -406,13 +406,10 @@ class RISCV:
             self.func[-1].append(f'\tj\t.{self.funcname}.{smt[3]}\n')
             self.end = True
         elif smt[0] == llvmEnum.Phi:
-            self.Reg.alloca(smt[1])
             if self.label not in self.phiaddr:
                 self.phiaddr[self.label] = str(self.Reg.Unused.pop(0) + self.pc) + '(sp)'
             taraddr = self.phiaddr[self.label]
-            reg = self.Reg.Regtouse[0]
-            self.func[-1].append(f"\tlw\t{reg}, {taraddr}\n")
-            self.Reg.store(self.func[-1], reg, self.Reg.var2Addr(self.func[-1], smt[1])[0], [])
+            self.Reg.Vars2addr[smt[1]] = taraddr
         else:
             print(smt)
 
