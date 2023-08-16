@@ -443,3 +443,13 @@ class RISCV:
             for str in var:
                 self.output.write(str)
         self.output.flush()
+    def print(self):
+        print('\t.text\n', end='')
+        for func in self.func:
+            for str in func:
+                print(str, end='')
+        print('\t.data\n', end='')
+        for var in self.globalvar:
+            for str in var:
+                print(str, end='')
+
