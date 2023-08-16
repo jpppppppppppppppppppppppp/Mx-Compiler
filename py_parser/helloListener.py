@@ -1,4 +1,4 @@
-# Generated from C:/Users/14908/Desktop/PPCA/Complier\hello.g4 by ANTLR 4.12.0
+# Generated from C:/Users/14908/Desktop/PPCA/Compiler\hello.g4 by ANTLR 4.12.0
 from antlr4 import *
 if __name__ is not None and "." in __name__:
     from .helloParser import helloParser

@@ -1,4 +1,4 @@
-# Generated from C:/Users/14908/Desktop/PPCA/Complier\hello.g4 by ANTLR 4.12.0
+# Generated from C:/Users/14908/Desktop/PPCA/Compiler\hello.g4 by ANTLR 4.12.0
 # encoding: utf-8
 from antlr4 import *
 from io import StringIO
