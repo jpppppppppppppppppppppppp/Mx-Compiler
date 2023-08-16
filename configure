@@ -4,4 +4,4 @@ mkdir bin/
 mkdir bin/RISCV
 cp -r main.py py_parser builtin.s bin/
 cp -r RISCV.py bin/RISCV
-mv bin/main.py bin/mxc
+cp bin/main.py bin/mxc
