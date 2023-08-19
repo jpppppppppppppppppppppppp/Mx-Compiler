@@ -1,6 +1,4 @@
-import copy
-
-from main import llvmEnum
+from llvmEnum import *
 
 binaryopt = {'mul': 'mul', 'sdiv': 'div', 'add': 'add', 'sub': 'sub', 'srem': 'rem', 'shl': 'sll', 'ashr': 'sra', 'and': 'and', 'or': 'or', 'xor': 'xor'}
 
@@ -177,11 +175,6 @@ class Regtrival:
             raise Exception("Warning")
         self.store(array, reg, ans, clean)
 
-    def copy(self, array, target, var, clean):
-        reg = self.Regtouse[0]
-        array.append(f"\tandi\t{reg}, {var}, 1\n")
-        self.store(array, reg, target, clean)
-
 
 class RISCV:
     def __init__(self, filename):
@@ -238,9 +231,12 @@ class RISCV:
             varAddr = {}
             needpc = array[3] + self.Maxarg + len(array[1]) + 3
         for block in array[2]:
-            if block[1][0] == llvmEnum.Phi:
-                needpc += 1
-                self.phi[block[0][1]] = {block[1][4]: block[1][3], block[1][6]: block[1][5]}
+            for smt in block:
+                if smt[0] == llvmEnum.Phi:
+                    needpc += 1
+                    self.phi[smt[1]] = {}
+                    for arg in smt[3]:
+                        self.phi[smt[1]][arg[1]] = arg[0]
         self.func.append([f"\t.globl {funcname}\n", f"{funcname}:\t\t# @{funcname}\n"])
         self.init(varReg, varAddr, (needpc + 3) & ~3)
         for block in array[2]:
@@ -362,19 +358,9 @@ class RISCV:
             self.Reg.alloca(smt[1])
             self.Reg.Icmp(self.func[-1], smt[2], varReg1, varReg2, self.Reg.var2Addr(self.func[-1], smt[1])[0], temp)
         elif smt[0] == llvmEnum.Zext:
-            temp = []
-            varReg, clean = self.Reg.var2Reg(self.func[-1], smt[2])
-            for toclear in clean:
-                temp.append(toclear)
-            self.Reg.alloca(smt[1])
-            self.Reg.copy(self.func[-1], self.Reg.var2Addr(self.func[-1], smt[1])[0], varReg, temp)
+            self.Reg.Vars2addr[smt[1]] = self.Reg.Vars2addr[smt[2]]
         elif smt[0] == llvmEnum.Trunc:
-            temp = []
-            varReg, clean = self.Reg.var2Reg(self.func[-1], smt[2])
-            for toclear in clean:
-                temp.append(toclear)
-            self.Reg.alloca(smt[1])
-            self.Reg.copy(self.func[-1], self.Reg.var2Addr(self.func[-1], smt[1])[0], varReg, temp)
+            self.Reg.Vars2addr[smt[1]] = self.Reg.Vars2addr[smt[2]]
         elif smt[0] == llvmEnum.Br:
             temp = []
             if smt[2] in self.phi and self.label in self.phi[smt[2]]:
@@ -411,7 +397,7 @@ class RISCV:
             taraddr = self.phiaddr[self.label]
             self.Reg.Vars2addr[smt[1]] = taraddr
         else:
-            print(smt)
+            pass
 
     def init(self, needReg, needAddr, needpc):
         self.func[-1].append(f"\taddi\tsp, sp, -{needpc * 4}\n")
@@ -440,6 +426,7 @@ class RISCV:
             for str in var:
                 self.output.write(str)
         self.output.flush()
+
     def print(self):
         print('\t.text\n', end='')
         for func in self.func:
@@ -449,4 +436,3 @@ class RISCV:
         for var in self.globalvar:
             for str in var:
                 print(str, end='')
-
