@@ -14,6 +14,8 @@ import codecs
 from RISCV import *
 from mem2reg import *
 from llvmEnum import *
+from regalloc import *
+
 
 def extract_input_output_exitcode(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
@@ -123,7 +125,13 @@ class typeclass:
     def __eq__(self, other):
         if other == None:
             return False
-        return self.type == other.type and self.name == other.name and self.dim == other.dim
+        if self.type == other.type and self.name == other.name and self.dim == other.dim:
+            return True
+        if self.dim > 0:
+            return other.type == typeEnum.NULL and other.dim == 0
+        if other.dim > 0:
+            return self.type == typeEnum.NULL and self.dim == 0
+        return False
 
     def __debugger__(self, n):
         for i in range(n):
@@ -601,9 +609,6 @@ class ClassScope:
         self.ConstructFunc = ASTEmptyNode()
 
 
-
-
-
 def llvmstring(node):
     if node[0] == llvmEnum.Alloca:
         return f"\t{node[1]} = alloca {node[2]}\n"
@@ -709,7 +714,7 @@ class ASTBuilder:
         self.initnum = 0
         self.classScope = []
         self.FunctionScope = []
-        self.translator = RISCV('test.s')
+        self.translator = regalloc()
         self.mem2reg = mem2reg()
 
     def build(self, node):
@@ -1390,7 +1395,10 @@ class ASTBuilder:
             if check:
                 if subret != None:
                     if not subret == funcnode.retType:
-                        return None, False
+                        if funcnode.retType.dim > 0 and subret == typeclass(t=typeEnum.NULL):
+                            retType = funcnode.retType
+                        else:
+                            return None, False
                     else:
                         retType = subret
             else:
@@ -1541,7 +1549,6 @@ class ASTBuilder:
             if not check:
                 return False
         for i in range(len(node.BlockSmt.Smt)):
-
             retType, check = self.checkFuncSmt(node, node.BlockSmt.Smt[i])
             if check:
                 if retType != None:
@@ -3647,16 +3654,21 @@ declare ptr @malloc(i32)
             if name in self.Scopes[i].VarsBank:
                 return self.Scopes[i].VarsBank[name]
 
+    # def riscv(self):
+    #     maxarg = 0
+    #     for func in self.llvmfunc:
+    #         maxarg = max(maxarg, len(self.llvmfunc[func][1]) - 8)
+    #     self.translator.Maxarg = maxarg
+    #     for smt in self.globalvars:
+    #         self.translator.translateglobalvars(smt)
+    #     for func in self.llvmfunc:
+    #         self.translator.translatefunction(func, self.llvmfunc[func])
+    #     self.translator.write()
     def riscv(self):
         maxarg = 0
         for func in self.llvmfunc:
             maxarg = max(maxarg, len(self.llvmfunc[func][1]) - 8)
-        self.translator.Maxarg = maxarg
-        for smt in self.globalvars:
-            self.translator.translateglobalvars(smt)
-        for func in self.llvmfunc:
-            self.translator.translatefunction(func, self.llvmfunc[func])
-        self.translator.write()
+        self.translator.translate(self.globalvars, self.llvmfunc)
 
     def Mem2Reg(self):
         self.mem2reg.run(self.llvmfunc)
@@ -3749,82 +3761,82 @@ if __name__ == "__main__":
     #     if not flag:
     #         sys.exit(-1)
 
-    root = os.listdir(sys.argv[1])
-    for files in root:
-        if files[-3:] == '.mx' or files[-3:] == '.mt':
-            input_data, output_data, exitcode = extract_input_output_exitcode(sys.argv[1] + '\\' + files)
-            try:
-                print(files + ':', end='')
-                output = open('output.ll', 'w')
-                input_stream = FileStream(sys.argv[1] + '\\' + files, encoding="utf-8")
-                lexer = helloLexer(input_stream)
-                lexer._listeners = [MyErrorListener()]
-                stream = CommonTokenStream(lexer)
-                parser = helloParser(stream)
-                parser._listeners = [MyErrorListener()]
-                cst = parser.body()
-                builder = ASTBuilder()
-                ast = builder.build(cst)
-                flag = builder.check(ast)
-                builder.llvm(ast)
-                output.flush()
-                commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && clang-15 -m32 builtin.ll output.ll -o test && ./test"'
-                process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
-                stdout, _ = process.communicate(input=input_data)
-                print(stdout.strip() == output_data, process.returncode == int(exitcode.strip()))
-            except Exception as e:
-                flag = False
-        elif files[-3:] == 'txt':
-            continue
-        elif files[-3:] == 'cpp':
-            continue
-        elif files[-2:] == '.c':
-            continue
-        elif files[-3:] == 'csv':
-            continue
-        elif files[-3:] == '.py':
-            continue
-        else:
-            subfile = os.listdir(sys.argv[1] + '\\' + files)
-            for file in subfile:
-                input_data, output_data, exitcode = extract_input_output_exitcode(sys.argv[1] + '\\' + files + '\\' + file)
-                try:
-                    print(file + ':', end='')
-                    output = open('output.ll', 'w')
-                    input_stream = FileStream(sys.argv[1] + '\\' + files + '\\' + file, encoding="utf-8")
-                    lexer = helloLexer(input_stream)
-                    lexer._listeners = [MyErrorListener()]
-                    stream = CommonTokenStream(lexer)
-                    parser = helloParser(stream)
-                    parser._listeners = [MyErrorListener()]
-                    cst = parser.body()
-                    builder = ASTBuilder()
-                    ast = builder.build(cst)
-                    flag = builder.check(ast)
-                    builder.llvm(ast)
-                    output.flush()
-                    commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && clang-15 -m32 builtin.ll output.ll -o test && ./test"'
-                    process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
-                    stdout, _ = process.communicate(input=input_data)
-                    print(stdout.strip() == output_data, process.returncode == int(exitcode.strip()))
-                except Exception as e:
-                    flag = False
+    # root = os.listdir(sys.argv[1])
+    # for files in root:
+    #     if files[-3:] == '.mx' or files[-3:] == '.mt':
+    #         input_data, output_data, exitcode = extract_input_output_exitcode(sys.argv[1] + '\\' + files)
+    #         try:
+    #             print(files + ':', end='')
+    #             output = open('output.ll', 'w')
+    #             input_stream = FileStream(sys.argv[1] + '\\' + files, encoding="utf-8")
+    #             lexer = helloLexer(input_stream)
+    #             lexer._listeners = [MyErrorListener()]
+    #             stream = CommonTokenStream(lexer)
+    #             parser = helloParser(stream)
+    #             parser._listeners = [MyErrorListener()]
+    #             cst = parser.body()
+    #             builder = ASTBuilder()
+    #             ast = builder.build(cst)
+    #             flag = builder.check(ast)
+    #             builder.llvm(ast)
+    #             output.flush()
+    #             commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && clang-15 -m32 builtin.ll output.ll -o test && ./test"'
+    #             process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
+    #             stdout, _ = process.communicate(input=input_data)
+    #             print(stdout.strip() == output_data, process.returncode == int(exitcode.strip()))
+    #         except Exception as e:
+    #             flag = False
+    #     elif files[-3:] == 'txt':
+    #         continue
+    #     elif files[-3:] == 'cpp':
+    #         continue
+    #     elif files[-2:] == '.c':
+    #         continue
+    #     elif files[-3:] == 'csv':
+    #         continue
+    #     elif files[-3:] == '.py':
+    #         continue
+    #     else:
+    #         subfile = os.listdir(sys.argv[1] + '\\' + files)
+    #         for file in subfile:
+    #             input_data, output_data, exitcode = extract_input_output_exitcode(sys.argv[1] + '\\' + files + '\\' + file)
+    #             try:
+    #                 print(file + ':', end='')
+    #                 output = open('output.ll', 'w')
+    #                 input_stream = FileStream(sys.argv[1] + '\\' + files + '\\' + file, encoding="utf-8")
+    #                 lexer = helloLexer(input_stream)
+    #                 lexer._listeners = [MyErrorListener()]
+    #                 stream = CommonTokenStream(lexer)
+    #                 parser = helloParser(stream)
+    #                 parser._listeners = [MyErrorListener()]
+    #                 cst = parser.body()
+    #                 builder = ASTBuilder()
+    #                 ast = builder.build(cst)
+    #                 flag = builder.check(ast)
+    #                 builder.llvm(ast)
+    #                 output.flush()
+    #                 commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && clang-15 -m32 builtin.ll output.ll -o test && ./test"'
+    #                 process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
+    #                 stdout, _ = process.communicate(input=input_data)
+    #                 print(stdout.strip() == output_data, process.returncode == int(exitcode.strip()))
+    #             except Exception as e:
+    #                 flag = False
 
-    # output = open('output.ll', 'w')
-    # input_stream = FileStream(r"C:\Users\14908\Desktop\PPCA\Compiler\test.txt", encoding="utf-8")
-    # lexer = helloLexer(input_stream)
-    # lexer._listeners = [MyErrorListener()]
-    # stream = CommonTokenStream(lexer)
-    # parser = helloParser(stream)
-    # parser._listeners = [MyErrorListener()]
-    # cst = parser.body()
-    # builder = ASTBuilder()
-    # ast = builder.build(cst)
-    # flag = builder.check(ast)
-    # print(flag)
-    # builder.llvm(ast)
-    # output.close()
-    # builder.riscv()
+    output = open('output.ll', 'w')
+    input_stream = FileStream(r"C:\Users\14908\Desktop\PPCA\Compiler\test.txt", encoding="utf-8")
+    lexer = helloLexer(input_stream)
+    lexer._listeners = [MyErrorListener()]
+    stream = CommonTokenStream(lexer)
+    parser = helloParser(stream)
+    parser._listeners = [MyErrorListener()]
+    cst = parser.body()
+    builder = ASTBuilder()
+    ast = builder.build(cst)
+    flag = builder.check(ast)
+    print(flag)
+    builder.llvm(ast)
+    output.close()
+    builder.riscv()
     # input_data, output_data, exitcode = extract_input_output_exitcode(r"C:\Users\14908\Desktop\PPCA\Compiler\test.txt")
     # temp = open('test.in', 'w')
     # temp.write(input_data)
