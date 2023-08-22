@@ -125,13 +125,7 @@ class typeclass:
     def __eq__(self, other):
         if other == None:
             return False
-        if self.type == other.type and self.name == other.name and self.dim == other.dim:
-            return True
-        if self.dim > 0:
-            return other.type == typeEnum.NULL and other.dim == 0
-        if other.dim > 0:
-            return self.type == typeEnum.NULL and self.dim == 0
-        return False
+        return self.type == other.type and self.name == other.name and self.dim == other.dim
 
     def __debugger__(self, n):
         for i in range(n):
@@ -2003,7 +1997,7 @@ declare ptr @malloc(i32)
     def getelementptr(self, node):
         where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
         if type(node).__name__ == "ASTIdentifierExprNode":
-            if len(self.classScope) > 0 and node.id in self.classScope[-1]:
+            if len(self.classScope) > 0 and node.id in self.classScope[-1] and not self.checkfunc(node.id):
                 newvar = f"%._{self.Scopes[-1].tempvar}"
                 self.Scopes[-1].tempvar += 1
                 self.Scopes[-1].VarsBank[newvar] = self.classScope[-1][node.id][0]
@@ -3141,9 +3135,16 @@ declare ptr @malloc(i32)
         where.append([llvmEnum.Trunc, newvar, var])
         where.append([llvmEnum.Br, newvar, label1, label2])
 
+    def checkfunc(self, vars):
+        for i in range(len(self.Scopes) - 1, -1, -1):
+            if self.Scopes[i].type != ScopeEnum.Class:
+                if vars in self.Scopes[i].VarsBank:
+                    return True
+        return False
+
     def generateload(self, where, typetodo, vars, target):
         if type(vars).__name__ == 'ASTIdentifierExprNode':
-            if len(self.classScope) > 0 and vars.id in self.classScope[-1]:
+            if len(self.classScope) > 0 and vars.id in self.classScope[-1] and not self.checkfunc(vars.id):
                 newvar = f"%._{self.Scopes[-1].tempvar}"
                 self.Scopes[-1].tempvar += 1
                 self.Scopes[-1].VarsBank[newvar] = self.classScope[-1][vars.id][0]
@@ -3836,7 +3837,7 @@ if __name__ == "__main__":
     print(flag)
     builder.llvm(ast)
     output.close()
-    builder.riscv()
+
     # input_data, output_data, exitcode = extract_input_output_exitcode(r"C:\Users\14908\Desktop\PPCA\Compiler\test.txt")
     # temp = open('test.in', 'w')
     # temp.write(input_data)

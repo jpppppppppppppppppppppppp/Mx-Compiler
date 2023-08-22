@@ -1,4 +1,6 @@
 from enum import Enum
+
+
 class llvmEnum(Enum):
     Alloca = 0
     GlobalString = 1
@@ -21,5 +23,6 @@ class llvmEnum(Enum):
     FuncCall = 18
     FuncVoid = 19
     Pass = 20
+
     def __eq__(self, other):
         return self.value == other.value

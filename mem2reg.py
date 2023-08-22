@@ -214,7 +214,9 @@ class mem2reg:
                 varbank[label][arg] = f'%{arg[1:]}.{temp[arg]}'
                 phi[label][arg]['name'] = f'%{arg[1:]}.{temp[arg]}'
                 temp[arg] += 1
-        self.rename('entry', varbank, phi, df, parent, dt, typelist)
+        task = ['entry']
+        while len(task) > 0:
+            self.rename(task, varbank, phi, df, parent, dt, typelist)
         self.next.clear()
         self.pre.clear()
         for block in function[2]:
@@ -261,8 +263,8 @@ class mem2reg:
                     function[2].pop(i)
                     break
 
-
-    def rename(self, label, varbank, phi, df, parent, dt, typelist):
+    def rename(self, task, varbank, phi, df, parent, dt, typelist):
+        label = task.pop(0)
         if label not in varbank:
             varbank[label] = {}
         for i in range(len(self.blocks[label])):
@@ -340,17 +342,19 @@ class mem2reg:
                     else:
                         phi[next][var][label] = todo
         for child in dt[label]:
-            self.rename(child, varbank, phi, df, parent, dt, typelist)
+            task.append(child)
 
     def getvalue(self, label, parent, varbank, varname):
-        if varname.isdigit() or varname[1:].isdigit():
-            return varname
-        if varname in varbank[label]:
-            return varbank[label][varname]
-        if label in parent:
-            return self.getvalue(parent[label], parent, varbank, varname)
-        if varname in ['true', 'false', 'null']:
-            return varname
-        if varname[0] == '@':
-            return varname
-        return None
+        while True:
+            if varname.isdigit() or varname[1:].isdigit():
+                return varname
+            if varname in varbank[label]:
+                return varbank[label][varname]
+            if label in parent:
+                label = parent[label]
+                continue
+            if varname in ['true', 'false', 'null']:
+                return varname
+            if varname[0] == '@':
+                return varname
+            return None
