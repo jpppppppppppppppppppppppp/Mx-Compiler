@@ -1,6 +1,8 @@
 from llvmEnum import *
 
-reg2use = ['a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7']
+reg2use = ['a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 't0', 't1', 't2', 't3', 't4', 't5', 't6', 's0', 's1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9',
+           's10', 's11']
+caller = ['a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 't0', 't1', 't2', 't3', 't4', 't5', 't6']
 
 
 class regalloc:
@@ -240,9 +242,9 @@ class regalloc:
                     liveout[label][i] = liveout[label][nextind].copy()
                     nextind = i
                     liveout[label][i].discard(smt[1])
-                    liveout[label][i].add(smt[2])
-                    if smt[2][0] == '@':
-                        liveout[label][i].discard(smt[2])
+                    liveout[label][i].add(smt[3])
+                    if smt[3][0] == '@':
+                        liveout[label][i].discard(smt[3])
                 elif smt[0] == llvmEnum.Return:
                     liveout[label][i] = liveout[label][nextind].copy()
                     nextind = i
@@ -345,6 +347,18 @@ class regalloc:
         confivar = {}
         varsinstack = {}
         for label in alllabel:
+            if label == 'entry':
+                temp = allin[label].copy()
+                for j in range(len(function[1])-1,-1,-1):
+                    arg = function[1][j][1]
+                    if arg not in edges:
+                        edges[arg] = set()
+                    for var in temp:
+                        if var not in edges:
+                            edges[var] = set()
+                        edges[arg].add(var)
+                        edges[var].add(arg)
+                    temp.discard(arg)
             for i in range(len(alllabel[label])):
                 smt = alllabel[label][i]
                 if smt[0] == llvmEnum.Alloca:
