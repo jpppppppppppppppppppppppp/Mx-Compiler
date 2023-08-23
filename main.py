@@ -11,34 +11,6 @@ from antlr4.error.ErrorListener import ErrorListener
 import subprocess
 import re
 import codecs
-from enum import Enum
-
-
-class llvmEnum(Enum):
-    Alloca = 0
-    GlobalString = 1
-    ClassType = 2
-    Load = 3
-    Return = 4
-    ReturnVoid = 5
-    GlobalVar = 6
-    Getelementptr1 = 7
-    Getelementptr2 = 8
-    Label = 9
-    Jump = 10
-    Trunc = 11
-    Br = 12
-    Zext = 13
-    Phi = 14
-    Icmp = 15
-    Store = 16
-    Binary = 17
-    FuncCall = 18
-    FuncVoid = 19
-    Pass = 20
-
-    def __eq__(self, other):
-        return self.value == other.value
 
 
 binaryopt = {'mul': 'mul', 'sdiv': 'div', 'add': 'add', 'sub': 'sub', 'srem': 'rem', 'shl': 'sll', 'ashr': 'sra', 'and': 'and', 'or': 'or', 'xor': 'xor'}
@@ -216,6 +188,11 @@ class Regtrival:
             raise Exception("Warning")
         self.store(array, reg, ans, clean)
 
+    def copy(self, array, target, var, clean):
+        reg = self.Regtouse[0]
+        array.append(f"\tandi\t{reg}, {var}, 1\n")
+        self.store(array, reg, target, clean)
+
 
 class RISCV:
     def __init__(self, filename):
@@ -272,12 +249,9 @@ class RISCV:
             varAddr = {}
             needpc = array[3] + self.Maxarg + len(array[1]) + 3
         for block in array[2]:
-            for smt in block:
-                if smt[0] == llvmEnum.Phi:
-                    needpc += 1
-                    self.phi[smt[1]] = {}
-                    for arg in smt[3]:
-                        self.phi[smt[1]][arg[1]] = arg[0]
+            if block[1][0] == llvmEnum.Phi:
+                needpc += 1
+                self.phi[block[0][1]] = {block[1][4]: block[1][3], block[1][6]: block[1][5]}
         self.func.append([f"\t.globl {funcname}\n", f"{funcname}:\t\t# @{funcname}\n"])
         self.init(varReg, varAddr, (needpc + 3) & ~3)
         for block in array[2]:
@@ -399,9 +373,19 @@ class RISCV:
             self.Reg.alloca(smt[1])
             self.Reg.Icmp(self.func[-1], smt[2], varReg1, varReg2, self.Reg.var2Addr(self.func[-1], smt[1])[0], temp)
         elif smt[0] == llvmEnum.Zext:
-            self.Reg.Vars2addr[smt[1]] = self.Reg.Vars2addr[smt[2]]
+            temp = []
+            varReg, clean = self.Reg.var2Reg(self.func[-1], smt[2])
+            for toclear in clean:
+                temp.append(toclear)
+            self.Reg.alloca(smt[1])
+            self.Reg.copy(self.func[-1], self.Reg.var2Addr(self.func[-1], smt[1])[0], varReg, temp)
         elif smt[0] == llvmEnum.Trunc:
-            self.Reg.Vars2addr[smt[1]] = self.Reg.Vars2addr[smt[2]]
+            temp = []
+            varReg, clean = self.Reg.var2Reg(self.func[-1], smt[2])
+            for toclear in clean:
+                temp.append(toclear)
+            self.Reg.alloca(smt[1])
+            self.Reg.copy(self.func[-1], self.Reg.var2Addr(self.func[-1], smt[1])[0], varReg, temp)
         elif smt[0] == llvmEnum.Br:
             temp = []
             if smt[2] in self.phi and self.label in self.phi[smt[2]]:
@@ -433,12 +417,15 @@ class RISCV:
             self.func[-1].append(f'\tj\t.{self.funcname}.{smt[3]}\n')
             self.end = True
         elif smt[0] == llvmEnum.Phi:
+            self.Reg.alloca(smt[1])
             if self.label not in self.phiaddr:
                 self.phiaddr[self.label] = str(self.Reg.Unused.pop(0) + self.pc) + '(sp)'
             taraddr = self.phiaddr[self.label]
-            self.Reg.Vars2addr[smt[1]] = taraddr
+            reg = self.Reg.Regtouse[0]
+            self.func[-1].append(f"\tlw\t{reg}, {taraddr}\n")
+            self.Reg.store(self.func[-1], reg, self.Reg.var2Addr(self.func[-1], smt[1])[0], [])
         else:
-            pass
+            print(smt)
 
     def init(self, needReg, needAddr, needpc):
         self.func[-1].append(f"\taddi\tsp, sp, -{needpc * 4}\n")
@@ -467,7 +454,6 @@ class RISCV:
             for str in var:
                 self.output.write(str)
         self.output.flush()
-
     def print(self):
         print('\t.text\n', end='')
         for func in self.func:
@@ -477,7 +463,6 @@ class RISCV:
         for var in self.globalvar:
             for str in var:
                 print(str, end='')
-
 
 
 def extract_input_output_exitcode(file_path):
@@ -502,8 +487,6 @@ def extract_input_output_exitcode(file_path):
     else:
         exitcode = ""
     return input_data, output_data, exitcode
-
-
 def extract_exitcode_time(content):
     exitcode_regex = r'exit code: (.*?)\n'
     time_regex = r'time: (.*?)\n'
@@ -513,11 +496,10 @@ def extract_exitcode_time(content):
     time = time_match.group(1).strip()
     return exitcode, time
 
-
 def getstring(str):
     res = ""
-    i = 0
-    while (i < len(str)):
+    i = 1
+    while (i < len(str) - 1):
         if str[i] != '\\':
             res = res + str[i]
         else:
@@ -1066,11 +1048,37 @@ class ClassScope:
         self.ConstructFunc = ASTEmptyNode()
 
 
+class llvmEnum(Enum):
+    Alloca = 0
+    GlobalString = 1
+    ClassType = 2
+    Load = 3
+    Return = 4
+    ReturnVoid = 5
+    GlobalVar = 6
+    Getelementptr1 = 7
+    Getelementptr2 = 8
+    Label = 9
+    Jump = 10
+    Trunc = 11
+    Br = 12
+    Zext = 13
+    Phi = 14
+    Icmp = 15
+    Store = 16
+    Binary = 17
+    FuncCall = 18
+    FuncVoid = 19
+
+    def __eq__(self, other):
+        return self.value == other.value
+
+
 def llvmstring(node):
     if node[0] == llvmEnum.Alloca:
         return f"\t{node[1]} = alloca {node[2]}\n"
     elif node[0] == llvmEnum.GlobalString:
-        return f"@.string.{node[1]} = global [ {node[2]} x i8 ] c\"{getstring(node[3])}\\00\"\n"
+        return f"@.string.{node[1]} = global [ {node[2]} x i8 ] c\"{node[3]}\\00\"\n"
     elif node[0] == llvmEnum.ClassType:
         return f"%.CLASS.{node[1]} = type " + '{ ' + ','.join(node[2]) + ' }\n'
     elif node[0] == llvmEnum.Load:
@@ -1096,9 +1104,7 @@ def llvmstring(node):
     elif node[0] == llvmEnum.Zext:
         return f"\t{node[1]} = zext i1 {node[2]} to i32\n"
     elif node[0] == llvmEnum.Phi:
-        res = f"\t{node[1]} = phi {node[2]}"
-        res = res + ','.join(map(lambda x: f' [ {x[0]}, %{x[1]} ]', node[3])) + '\n'
-        return res
+        return f"\t{node[1]} = phi {node[2]} [ {node[3]}, %{node[4]} ], [ {node[5]}, %{node[6]} ]\n"
     elif node[0] == llvmEnum.Icmp:
         return f"\t{node[1]} = icmp {node[2]} {node[3]} {node[4]}, {node[5]}\n"
     elif node[0] == llvmEnum.Store:
@@ -1110,7 +1116,7 @@ def llvmstring(node):
     elif node[0] == llvmEnum.FuncVoid:
         return f"\tcall void @{node[1]}( " + ','.join(map(lambda x: x[0] + ' ' + x[1], node[2])) + ' )\n'
     else:
-        return ''
+        raise Exception("Warning")
 
 
 class ASTBuilder:
@@ -1171,8 +1177,7 @@ class ASTBuilder:
         self.initnum = 0
         self.classScope = []
         self.FunctionScope = []
-        self.translator = regalloc()
-        self.mem2reg = mem2reg()
+        self.translator = RISCV('test.s')
 
     def build(self, node):
         if not isinstance(node, ParserRuleContext):
@@ -1291,7 +1296,7 @@ class ASTBuilder:
     def buildBinaryExprContext(self, node):
         res = ASTBinaryExprNode(op=node.op.text, lhs=self.build(node.lhs), rhs=self.build(node.rhs))
         if type(res.rhs).__name__ == "ASTConstExprContextNode" and type(res.lhs).__name__ != "ASTConstExprContextNode" and (
-                res.op in ['+', '*', '&', '|', '^']) and res.rhs.type.type in [typeEnum.INT, typeEnum.BOOL]:
+                res.op in ['+', '*', '&', '|', '^', '&&', '||']) and res.rhs.type.type in [typeEnum.INT, typeEnum.BOOL]:
             lhs = res.lhs
             rhs = res.rhs
             res.lhs = rhs
@@ -1852,10 +1857,7 @@ class ASTBuilder:
             if check:
                 if subret != None:
                     if not subret == funcnode.retType:
-                        if funcnode.retType.dim > 0 and subret == typeclass(t=typeEnum.NULL):
-                            retType = funcnode.retType
-                        else:
-                            return None, False
+                        return None, False
                     else:
                         retType = subret
             else:
@@ -2006,6 +2008,7 @@ class ASTBuilder:
             if not check:
                 return False
         for i in range(len(node.BlockSmt.Smt)):
+
             retType, check = self.checkFuncSmt(node, node.BlockSmt.Smt[i])
             if check:
                 if retType != None:
@@ -2058,7 +2061,6 @@ class ASTBuilder:
 
         for child in node.children:
             self.llvm(child)
-
         output.write('''declare void @print(ptr)
 declare void @println(ptr)
 declare void @printInt(i32)
@@ -2460,7 +2462,7 @@ declare ptr @malloc(i32)
     def getelementptr(self, node):
         where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
         if type(node).__name__ == "ASTIdentifierExprNode":
-            if len(self.classScope) > 0 and node.id in self.classScope[-1] and not self.checkfunc(node.id):
+            if len(self.classScope) > 0 and node.id in self.classScope[-1]:
                 newvar = f"%._{self.Scopes[-1].tempvar}"
                 self.Scopes[-1].tempvar += 1
                 self.Scopes[-1].VarsBank[newvar] = self.classScope[-1][node.id][0]
@@ -3598,16 +3600,9 @@ declare ptr @malloc(i32)
         where.append([llvmEnum.Trunc, newvar, var])
         where.append([llvmEnum.Br, newvar, label1, label2])
 
-    def checkfunc(self, vars):
-        for i in range(len(self.Scopes) - 1, -1, -1):
-            if self.Scopes[i].type != ScopeEnum.Class:
-                if vars in self.Scopes[i].VarsBank:
-                    return True
-        return False
-
     def generateload(self, where, typetodo, vars, target):
         if type(vars).__name__ == 'ASTIdentifierExprNode':
-            if len(self.classScope) > 0 and vars.id in self.classScope[-1] and not self.checkfunc(vars.id):
+            if len(self.classScope) > 0 and vars.id in self.classScope[-1]:
                 newvar = f"%._{self.Scopes[-1].tempvar}"
                 self.Scopes[-1].tempvar += 1
                 self.Scopes[-1].VarsBank[newvar] = self.classScope[-1][vars.id][0]
@@ -3710,52 +3705,40 @@ declare ptr @malloc(i32)
                         if vars.op == '&&':
                             self.generatebranch(where, lhsnewvar, rhslabel, endlabel)
                             self.Scopes[-1].dim = rhsind
-                            if type(vars.rhs).__name__ == "ASTConstExprContextNode":
-                                if vars.rhs.value:
-                                    tobool = 'true'
-                                else:
-                                    tobool = 'false'
-                            else:
-                                newvar = f"%._{self.Scopes[-1].tempvar}"
-                                self.Scopes[-1].tempvar += 1
-                                self.NameSpace[-1].VarsBank[newvar] = newvar
-                                self.Scopes[-1].VarsBank[newvar] = typeclass(t=typeEnum.BOOL)
-                                self.generateload(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], typeclass(t=typeEnum.BOOL), vars.rhs, newvar)
-                                tobool = f"%._{self.Scopes[-1].tempvar}"
-                                self.Scopes[-1].tempvar += 1
-                                self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append([llvmEnum.Trunc, tobool, newvar])
+                            newvar = f"%._{self.Scopes[-1].tempvar}"
+                            self.Scopes[-1].tempvar += 1
+                            self.NameSpace[-1].VarsBank[newvar] = newvar
+                            self.Scopes[-1].VarsBank[newvar] = typeclass(t=typeEnum.BOOL)
+                            self.generateload(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], typeclass(t=typeEnum.BOOL), vars.rhs, newvar)
+                            tobool = f"%._{self.Scopes[-1].tempvar}"
+                            self.Scopes[-1].tempvar += 1
+                            self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append([llvmEnum.Trunc, tobool, newvar])
                             self.generatejump(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], endlabel)
                             rhsendlabel = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim][0][1]
                             self.Scopes[-1].dim = endind
                             newvar = f"%._{self.Scopes[-1].tempvar}"
                             self.Scopes[-1].tempvar += 1
                             self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append(
-                                [llvmEnum.Phi, newvar, 'i1', [['false', nowlabel], [tobool, rhsendlabel]]])
+                                [llvmEnum.Phi, newvar, 'i1', 'false', nowlabel, tobool, rhsendlabel])
                             self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append([llvmEnum.Zext, target, newvar])
                         else:
                             self.generatebranch(where, lhsnewvar, endlabel, rhslabel)
                             self.Scopes[-1].dim = rhsind
-                            if type(vars.rhs).__name__ == "ASTConstExprContextNode":
-                                if vars.rhs.value:
-                                    tobool = 'true'
-                                else:
-                                    tobool = 'false'
-                            else:
-                                newvar = f"%._{self.Scopes[-1].tempvar}"
-                                self.Scopes[-1].tempvar += 1
-                                self.NameSpace[-1].VarsBank[newvar] = newvar
-                                self.Scopes[-1].VarsBank[newvar] = typeclass(t=typeEnum.BOOL)
-                                self.generateload(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], typeclass(t=typeEnum.BOOL), vars.rhs, newvar)
-                                tobool = f"%._{self.Scopes[-1].tempvar}"
-                                self.Scopes[-1].tempvar += 1
-                                self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append([llvmEnum.Trunc, tobool, newvar])
+                            newvar = f"%._{self.Scopes[-1].tempvar}"
+                            self.Scopes[-1].tempvar += 1
+                            self.NameSpace[-1].VarsBank[newvar] = newvar
+                            self.Scopes[-1].VarsBank[newvar] = typeclass(t=typeEnum.BOOL)
+                            self.generateload(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], typeclass(t=typeEnum.BOOL), vars.rhs, newvar)
+                            tobool = f"%._{self.Scopes[-1].tempvar}"
+                            self.Scopes[-1].tempvar += 1
+                            self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append([llvmEnum.Trunc, tobool, newvar])
                             self.generatejump(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], endlabel)
                             rhsendlabel = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim][0][1]
                             self.Scopes[-1].dim = endind
                             newvar = f"%._{self.Scopes[-1].tempvar}"
                             self.Scopes[-1].tempvar += 1
                             self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append(
-                                [llvmEnum.Phi, newvar, 'i1', [['true', nowlabel], [tobool, rhsendlabel]]])
+                                [llvmEnum.Phi, newvar, 'i1', 'true', nowlabel, tobool, rhsendlabel])
                             self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append([llvmEnum.Zext, target, newvar])
                 elif lhstype == typeclass(t=typeEnum.NULL):
                     rhsptr = self.getelementptr(vars.rhs)
@@ -3976,7 +3959,7 @@ declare ptr @malloc(i32)
                 self.Scopes[-1].dim = endind
                 if typetodo != typeclass(t=typeEnum.VOID):
                     self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append(
-                        [llvmEnum.Phi, target, self.llvmtypeclass(typetodo), [[lhsnewvar, lhsendlabel], [rhsnewvar, rhsendlabel]]])
+                        [llvmEnum.Phi, target, self.llvmtypeclass(typetodo), lhsnewvar, lhsendlabel, rhsnewvar, rhsendlabel])
         elif type(vars).__name__ == 'ASTFuncCallExprNode':
             if vars.id[:5] == 'CLASS':
                 newvar = f"%._{self.Scopes[-1].tempvar}"
@@ -4140,14 +4123,6 @@ declare ptr @malloc(i32)
         for func in self.llvmfunc:
             self.translator.translatefunction(func, self.llvmfunc[func])
         self.translator.print()
-    # def riscv(self):
-    #     maxarg = 0
-    #     for func in self.llvmfunc:
-    #         maxarg = max(maxarg, len(self.llvmfunc[func][1]) - 8)
-    #     self.translator.translate(self.globalvars, self.llvmfunc)
-
-    def Mem2Reg(self):
-        self.mem2reg.run(self.llvmfunc)
 
 
 if __name__ == "__main__":
@@ -4236,7 +4211,6 @@ if __name__ == "__main__":
             flag = False
         if not flag:
             sys.exit(-1)
-
     # root = os.listdir(sys.argv[1])
     # for files in root:
     #     if files[-3:] == '.mx' or files[-3:] == '.mt':
@@ -4330,7 +4304,7 @@ if __name__ == "__main__":
     #         temp.write(input_data)
     #         temp.flush()
     #         try:
-    #             print('|' + files + '|', end='')
+    #             print(files + ':', end='')
     #             output = open('output.ll', 'w')
     #             input_stream = FileStream(sys.argv[1] + '\\' + files, encoding="utf-8")
     #             lexer = helloLexer(input_stream)
@@ -4353,7 +4327,7 @@ if __name__ == "__main__":
     #             outfile.close()
     #             content = content.strip()
     #             ec, t = extract_exitcode_time(stdout)
-    #             print(content == output_data, '|', int(ec) == int(exitcode.strip()), '|', t, '|')
+    #             print(content == output_data, int(ec) == int(exitcode.strip()), t)
     #         except Exception as e:
     #             flag = False
     #     elif files[-3:] == 'txt':
@@ -4374,7 +4348,7 @@ if __name__ == "__main__":
     #             temp.write(input_data)
     #             temp.flush()
     #             try:
-    #                 print('|' + file + '|', end='')
+    #                 print(file + ':', end='')
     #                 output = open('output.ll', 'w')
     #                 input_stream = FileStream(sys.argv[1] + '\\' + files + '\\' + file, encoding="utf-8")
     #                 lexer = helloLexer(input_stream)
@@ -4397,6 +4371,6 @@ if __name__ == "__main__":
     #                 outfile.close()
     #                 content = content.strip()
     #                 ec, t = extract_exitcode_time(stdout)
-    #                 print(content == output_data, '|', int(ec) == int(exitcode.strip()), '|', t, '|')
+    #                 print(content == output_data, int(ec) == int(exitcode.strip()), t)
     #             except Exception as e:
     #                 flag = False
