@@ -1,4 +1,4 @@
-from llvmEnum import *
+from classEnum import *
 
 
 class mem2reg:

@@ -13,7 +13,7 @@ import re
 import codecs
 from RISCV import *
 from mem2reg import *
-from llvmEnum import *
+from classEnum import *
 from regalloc import *
 
 
@@ -836,6 +836,8 @@ class ASTBuilder:
         if type(res.lhs).__name__ == "ASTConstExprContextNode" and type(res.rhs).__name__ == "ASTConstExprContextNode":
             if res.lhs.type.type == typeEnum.INT and res.rhs.type.type == typeEnum.INT:
                 if res.op in ['+', '-', '*', '/', '%', '<<', '>>', '&', '|', '^']:
+                    if res.op == '/' and res.rhs.value == 0:
+                        return ASTConstExprContextNode(t=typeclass(t=typeEnum.INT), v=0)
                     return ASTConstExprContextNode(t=typeclass(t=typeEnum.INT), v=int(eval(str(res.lhs.value) + res.op + str(res.rhs.value))))
                 elif res.op in ['<', '>', '<=', '>=', '==', '!=']:
                     return ASTConstExprContextNode(t=typeclass(t=typeEnum.BOOL), v=int(eval(str(res.lhs.value) + res.op + str(res.rhs.value))))

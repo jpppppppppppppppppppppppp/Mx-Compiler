@@ -1,17 +1,20 @@
-from llvmEnum import *
+from classEnum import *
 
 reg2use = ['a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 't0', 't1', 't2', 't3', 't4', 't5', 't6', 's0', 's1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9',
            's10', 's11']
 caller = ['a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 't0', 't1', 't2', 't3', 't4', 't5', 't6']
 
+binaryopt = {'mul': 'mul', 'sdiv': 'div', 'add': 'add', 'sub': 'sub', 'srem': 'rem', 'shl': 'sll', 'ashr': 'sra', 'and': 'and', 'or': 'or', 'xor': 'xor'}
+
 
 class regalloc:
     def __init__(self):
-        pass
+        self.varnum = 0
 
     def translate(self, globalvars, allfunc):
+        ir = {}
         for function in allfunc:
-            self.staticAnalyze(allfunc[function])
+            ir[function] = self.make(allfunc[function])
 
     def staticAnalyze(self, function):
         pre = {}
@@ -349,7 +352,7 @@ class regalloc:
         for label in alllabel:
             if label == 'entry':
                 temp = allin[label].copy()
-                for j in range(len(function[1])-1,-1,-1):
+                for j in range(len(function[1]) - 1, -1, -1):
                     arg = function[1][j][1]
                     if arg not in edges:
                         edges[arg] = set()
@@ -559,6 +562,125 @@ class regalloc:
                             edges[arg].add(cri)
                             edges[cri].add(arg)
                         temp.discard(arg)
-        print(edges)
-        print(confivar)
+        print(allout)
         allvar = {}
+
+    def make(self, array):
+        varbank = {}
+        tempconst = {}
+        ret = []
+        allblock = {'entry': [[lrEnum.label, 'entry']]}
+        for i in range(len(array[1])):
+            if i < 8:
+                varname = f"temp_{self.varnum}"
+                varbank[array[1][i][1]] = varname
+                self.varnum += 1
+                allblock['entry'].append([lrEnum.mv, varname, f'a{i}'])
+            else:
+                varname = f"temp_{self.varnum}"
+                varbank[array[1][i][1]] = varname
+                self.varnum += 1
+                allblock['entry'].append([lrEnum.lw, varname, (i - 8) * 4, 'sp'])
+        pre = {}
+        next = {}
+        phi = {}
+        for label in array[2]:
+            nowlabel = ""
+            for smt in label:
+                if smt[0] == llvmEnum.Label:
+                    nowlabel = smt[1]
+                    if nowlabel not in pre:
+                        pre[nowlabel] = []
+                    if nowlabel not in next:
+                        next[nowlabel] = []
+                elif smt[0] == llvmEnum.Br:
+                    if nowlabel not in next:
+                        next[nowlabel] = []
+                    next[nowlabel].append(smt[2])
+                    next[nowlabel].append(smt[3])
+                    if smt[2] not in pre:
+                        pre[smt[2]] = []
+                    pre[smt[2]].append(nowlabel)
+                    if smt[3] not in pre:
+                        pre[smt[3]] = []
+                    pre[smt[3]].append(nowlabel)
+                elif smt[0] == llvmEnum.Jump:
+                    if nowlabel not in next:
+                        next[nowlabel] = []
+                    next[nowlabel].append(smt[1])
+                    if smt[1] not in pre:
+                        pre[smt[1]] = []
+                    pre[smt[1]].append(nowlabel)
+                elif smt[0] == llvmEnum.Phi:
+                    for arg in smt[3]:
+                        if arg[1] not in phi:
+                            phi[arg[1]] = {}
+                        if nowlabel not in phi[arg[1]]:
+                            phi[arg[1]][nowlabel] = []
+                        phi[arg[1]][nowlabel].append([smt[1], arg[0]])
+        for label in array[2]:
+            nowlabel = ""
+            for smt in label:
+                if smt[0] == llvmEnum.Pass:
+                    continue
+                elif smt[0] == llvmEnum.Label:
+                    nowlabel = smt[1]
+                    if nowlabel not in allblock:
+                        allblock[nowlabel] = [[lrEnum.label, nowlabel]]
+                    ret.append(allblock[nowlabel])
+                elif smt[0] == llvmEnum.Alloca:
+                    raise Exception("No Alloca!")
+                elif smt[0] == llvmEnum.Binary:
+                    lhsvalue, lhscheck = self.constcheck(tempconst, smt[4])
+                    rhsvalue, rhscheck = self.constcheck(tempconst, smt[5])
+                    if lhscheck and rhscheck:
+                        tempconst[smt[1]] = self.getvalue(smt[2], lhsvalue, rhsvalue)
+                    else:
+                        varname = f"temp_{self.varnum}"
+                        self.varnum += 1
+                        varbank[smt[1]] = varname
+                        if lhscheck:
+                            allblock[nowlabel].append([lrEnum.li, varname, lhsvalue])
+                            allblock[nowlabel].append([lrEnum.binary, binaryopt[smt[2]], varname, varname, varbank[smt[5]]])
+                        elif rhscheck:
+                            allblock[nowlabel].append([lrEnum.binary, binaryopt[smt[2]] + 'i', varname, varbank[smt[4]], rhsvalue])
+                        else:
+                            allblock[nowlabel].append([lrEnum.binary, binaryopt[smt[2]], varname, varbank[smt[4]], varbank[smt[5]]])
+                elif smt[0] == llvmEnum.Return:
+                    if smt[2] in tempconst:
+                        allblock[nowlabel].append([lrEnum.li, 'a0', tempconst[smt[2]]])
+                    else:
+                        allblock[nowlabel].append([lrEnum.mv, 'a0', varbank[smt[2]]])
+                else:
+                    print(smt)
+        print(ret)
+        return ret
+
+    def constcheck(self, tempconst, var):
+        if var.isdigit() or var[1:].isdigit():
+            return int(var), True
+        if var in tempconst:
+            return tempconst[var], True
+        return None, False
+
+    def getvalue(self, op, lhs, rhs):
+        if op == 'add':
+            return lhs + rhs
+        if op == 'sub':
+            return lhs - rhs
+        if op == 'mul':
+            return lhs * rhs
+        if op == 'sdiv':
+            return lhs / rhs
+        if op == 'srem':
+            return lhs % rhs
+        if op == 'shl':
+            return lhs << rhs
+        if op == 'ashr':
+            return lhs >> rhs
+        if op == 'and':
+            return lhs & rhs
+        if op == 'xor':
+            return lhs ^ rhs
+        if op == 'or':
+            return lhs | rhs

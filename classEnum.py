@@ -26,3 +26,14 @@ class llvmEnum(Enum):
 
     def __eq__(self, other):
         return self.value == other.value
+
+
+class lrEnum(Enum):
+    mv = 0
+    lw = 1
+    label = 2
+    binary = 3
+    li = 4
+
+    def __eq__(self, other):
+        return self.value == other.value
