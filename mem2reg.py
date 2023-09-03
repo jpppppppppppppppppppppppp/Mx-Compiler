@@ -11,8 +11,10 @@ class mem2reg:
         self.allocavar = []
 
     def run(self, allfunc):
+        ret = {}
         for func in allfunc:
-            self.opt(allfunc[func])
+            ret[func] = self.opt(allfunc[func])
+        return ret
 
     def opt(self, function):
         self.next.clear()
@@ -262,7 +264,7 @@ class mem2reg:
                 if function[2][i][0][1] == todo:
                     function[2].pop(i)
                     break
-
+        return dt
     def rename(self, task, varbank, phi, df, parent, dt, typelist):
         label = task.pop(0)
         if label not in varbank:

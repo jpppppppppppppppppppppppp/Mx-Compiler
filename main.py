@@ -652,6 +652,7 @@ def llvmstring(node):
 
 class ASTBuilder:
     def __init__(self):
+        self.dt = None
         self.FuncBank = {}
         self.ClassBank = {}
         self.Scopes = [Scope(type=ScopeEnum.Global)]
@@ -3683,10 +3684,10 @@ declare ptr @malloc(i32)
         maxarg = 0
         for func in self.llvmfunc:
             maxarg = max(maxarg, len(self.llvmfunc[func][1]) - 8)
-        self.translator.translate(self.globalvars, self.llvmfunc)
+        self.translator.translate(self.globalvars, self.llvmfunc, self.dt)
 
     def Mem2Reg(self):
-        self.mem2reg.run(self.llvmfunc)
+        self.dt = self.mem2reg.run(self.llvmfunc)
 
 
 if __name__ == "__main__":

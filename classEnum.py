@@ -34,6 +34,14 @@ class lrEnum(Enum):
     label = 2
     binary = 3
     li = 4
+    ret = 5
+    call = 6
+    sw = 7
+    lui = 8
+    icmp = 9
+    j = 10
+    bnez = 11
+    binaryi = 12
 
     def __eq__(self, other):
         return self.value == other.value

@@ -11,10 +11,11 @@ class regalloc:
     def __init__(self):
         self.varnum = 0
 
-    def translate(self, globalvars, allfunc):
+    def translate(self, globalvars, allfunc, dt):
         ir = {}
         for function in allfunc:
-            ir[function] = self.make(allfunc[function])
+            ir[function] = self.make(function, allfunc[function], dt[function])
+            self.staticAnalyze(ir[function])
 
     def staticAnalyze(self, function):
         pre = {}
@@ -26,180 +27,100 @@ class regalloc:
         allused = {}
         nowlabel = ""
         alllabel = {}
-        for label in function[2]:
+        needra = False
+        mvlib = []
+        for label in function:
             for smt in label:
-                if smt[0] == llvmEnum.Label:
-                    nowlabel = smt[1]
-                elif smt[0] == llvmEnum.Phi:
-                    for sub in smt[3]:
-                        if sub[1] not in phi:
-                            phi[sub[1]] = {}
-                        phi[sub[1]][smt[1]] = sub[0]
-        for label in function[2]:
-            for smt in label:
-                if smt[0] == llvmEnum.Label:
-                    nowlabel = smt[1]
+                if smt[0] == lrEnum.label:
+                    nowlabel = smt[2]
                     alllabel[nowlabel] = label
                     if nowlabel not in pre:
                         pre[nowlabel] = set()
                     if nowlabel not in next:
                         next[nowlabel] = set()
-                    defd[nowlabel] = set()
+                    defd[nowlabel] = {'sp'}
                     used[nowlabel] = set()
-                    alldefd[nowlabel] = set()
+                    alldefd[nowlabel] = {'sp'}
                     allused[nowlabel] = set()
-                elif smt[0] == llvmEnum.Alloca:
+                elif smt[0] == lrEnum.mv:
+                    mvlib.append([smt[1], smt[2]])
+                    if smt[2] not in alldefd[nowlabel]:
+                        used[nowlabel].add(smt[2])
+                    allused[nowlabel].add(smt[2])
+                    if smt[1] not in allused[nowlabel]:
+                        defd[nowlabel].add(smt[1])
                     alldefd[nowlabel].add(smt[1])
-                    defd[nowlabel].add(smt[1])
-                elif smt[0] == llvmEnum.Load:
-                    alldefd[nowlabel].add(smt[1])
-                    defd[nowlabel].add(smt[1])
-                    if smt[3][0] == '@':
-                        if smt[3] not in allused[nowlabel]:
-                            defd[nowlabel].add(smt[3])
-                        alldefd[nowlabel].add(smt[3])
+                elif smt[0] == lrEnum.lw:
                     if smt[3] not in alldefd[nowlabel]:
                         used[nowlabel].add(smt[3])
                     allused[nowlabel].add(smt[3])
-                elif smt[0] == llvmEnum.Return:
-                    if smt[2][0] in ['%', '@']:
-                        if smt[2][0] == '@':
-                            if smt[2] not in allused[nowlabel]:
-                                defd[nowlabel].add(smt[2])
-                            alldefd[nowlabel].add(smt[2])
-                        if smt[2] not in alldefd[nowlabel]:
-                            used[nowlabel].add(smt[2])
-                        allused[nowlabel].add(smt[2])
-                elif smt[0] == llvmEnum.Getelementptr1:
+                    if smt[1] not in allused[nowlabel]:
+                        defd[nowlabel].add(smt[1])
                     alldefd[nowlabel].add(smt[1])
-                    defd[nowlabel].add(smt[1])
+                elif smt[0] == lrEnum.binary:
                     if smt[3] not in alldefd[nowlabel]:
                         used[nowlabel].add(smt[3])
                     allused[nowlabel].add(smt[3])
-                    if smt[4][0] in ['%', '@']:
-                        if smt[4] not in alldefd[nowlabel]:
-                            used[nowlabel].add(smt[4])
-                        allused[nowlabel].add(smt[4])
-                elif smt[0] == llvmEnum.Getelementptr2:
+                    if smt[4] not in alldefd[nowlabel]:
+                        used[nowlabel].add(smt[4])
+                    allused[nowlabel].add(smt[4])
+                    if smt[2] not in allused[nowlabel]:
+                        defd[nowlabel].add(smt[2])
+                    alldefd[nowlabel].add(smt[2])
+                elif smt[0] == lrEnum.li:
+                    if smt[1] not in allused[nowlabel]:
+                        defd[nowlabel].add(smt[1])
                     alldefd[nowlabel].add(smt[1])
-                    defd[nowlabel].add(smt[1])
+                elif smt[0] == lrEnum.ret:
+                    continue
+                elif smt[0] == lrEnum.call:
+                    needra = True
+                    for reg in caller:
+                        if reg not in allused[nowlabel]:
+                            defd[nowlabel].add(reg)
+                        alldefd[nowlabel].add(reg)
+                elif smt[0] == lrEnum.sw:
+                    if smt[1] not in alldefd[nowlabel]:
+                        used[nowlabel].add(smt[1])
+                    allused[nowlabel].add(smt[1])
                     if smt[3] not in alldefd[nowlabel]:
                         used[nowlabel].add(smt[3])
                     allused[nowlabel].add(smt[3])
-                    if smt[4][0] in ['%', '@']:
-                        if smt[4] not in alldefd[nowlabel]:
-                            used[nowlabel].add(smt[4])
-                        allused[nowlabel].add(smt[4])
-                elif smt[0] == llvmEnum.Jump:
-                    if nowlabel in phi:
-                        for var in phi[nowlabel]:
-                            if var not in allused[nowlabel]:
-                                defd[nowlabel].add(var)
-                            alldefd[nowlabel].add(var)
-                            if phi[nowlabel][var][0] in ['%', '@']:
-                                if phi[nowlabel][var] not in alldefd[nowlabel]:
-                                    used[nowlabel].add(phi[nowlabel][var])
-                                allused[nowlabel].add(phi[nowlabel][var])
-                    next[nowlabel].add(smt[1])
-                    if smt[1] not in pre:
-                        pre[smt[1]] = set()
-                    pre[smt[1]].add(nowlabel)
-                elif smt[0] == llvmEnum.Trunc:
+                elif smt[0] == lrEnum.lui:
+                    if smt[1] not in allused[nowlabel]:
+                        defd[nowlabel].add(smt[1])
                     alldefd[nowlabel].add(smt[1])
-                    defd[nowlabel].add(smt[1])
-                    if smt[2][0] in ['%', '@']:
-                        if smt[2] not in alldefd[nowlabel]:
-                            used[nowlabel].add(smt[2])
-                        allused[nowlabel].add(smt[2])
-                elif smt[0] == llvmEnum.Br:
-                    if nowlabel in phi:
-                        for var in phi[nowlabel]:
-                            if var not in allused[nowlabel]:
-                                defd[nowlabel].add(var)
-                            alldefd[nowlabel].add(var)
-                            if phi[nowlabel][var][0] in ['%', '@']:
-                                if phi[nowlabel][var] not in alldefd[nowlabel]:
-                                    used[nowlabel].add(phi[nowlabel][var])
-                                allused[nowlabel].add(phi[nowlabel][var])
-                    if smt[1][0] in ['%', '@']:
-                        if smt[1] not in alldefd[nowlabel]:
-                            used[nowlabel].add(smt[1])
-                        allused[nowlabel].add(smt[1])
+                elif smt[0] == lrEnum.icmp:
+                    if smt[2] not in allused[nowlabel]:
+                        defd[nowlabel].add(smt[2])
+                    alldefd[nowlabel].add(smt[2])
+                    if smt[3] not in alldefd[nowlabel]:
+                        used[nowlabel].add(smt[3])
+                    allused[nowlabel].add(smt[3])
+                elif smt[0] == lrEnum.j:
+                    if nowlabel not in next:
+                        next[nowlabel] = set()
                     next[nowlabel].add(smt[2])
-                    next[nowlabel].add(smt[3])
                     if smt[2] not in pre:
                         pre[smt[2]] = set()
                     pre[smt[2]].add(nowlabel)
+                elif smt[0] == lrEnum.bnez:
+                    if nowlabel not in next:
+                        next[nowlabel] = set()
+                    next[nowlabel].add(smt[3])
                     if smt[3] not in pre:
                         pre[smt[3]] = set()
                     pre[smt[3]].add(nowlabel)
-                elif smt[0] == llvmEnum.Zext:
-                    alldefd[nowlabel].add(smt[1])
-                    defd[nowlabel].add(smt[1])
-                    if smt[2][0] in ['%', '@']:
-                        if smt[2] not in alldefd[nowlabel]:
-                            used[nowlabel].add(smt[2])
-                        allused[nowlabel].add(smt[2])
-                elif smt[0] == llvmEnum.Icmp:
-                    alldefd[nowlabel].add(smt[1])
-                    defd[nowlabel].add(smt[1])
-                    if smt[4][0] in ['%', '@']:
-                        if smt[4] not in alldefd[nowlabel]:
-                            used[nowlabel].add(smt[4])
-                        allused[nowlabel].add(smt[4])
-                    if smt[5][0] in ['%', '@']:
-                        if smt[5] not in alldefd[nowlabel]:
-                            used[nowlabel].add(smt[5])
-                        allused[nowlabel].add(smt[5])
-                elif smt[0] == llvmEnum.Store:
-                    if smt[2][0] in ['%', '@']:
-                        if smt[2][0] == '@':
-                            if smt[2] not in allused[nowlabel]:
-                                defd[nowlabel].add(smt[2])
-                            alldefd[nowlabel].add(smt[2])
-                        if smt[2] not in alldefd[nowlabel]:
-                            used[nowlabel].add(smt[2])
-                        allused[nowlabel].add(smt[2])
-                    if smt[3][0] == '@':
-                        if smt[3] not in allused[nowlabel]:
-                            defd[nowlabel].add(smt[3])
-                        alldefd[nowlabel].add(smt[3])
-                    if smt[3] not in allused[nowlabel]:
-                        defd[nowlabel].add(smt[3])
-                    alldefd[nowlabel].add(smt[3])
-                elif smt[0] == llvmEnum.Binary:
-                    alldefd[nowlabel].add(smt[1])
-                    defd[nowlabel].add(smt[1])
-                    if smt[4][0] in ['%', '@']:
-                        if smt[4] not in alldefd[nowlabel]:
-                            used[nowlabel].add(smt[4])
-                        allused[nowlabel].add(smt[4])
-                    if smt[5][0] in ['%', '@']:
-                        if smt[5] not in alldefd[nowlabel]:
-                            used[nowlabel].add(smt[5])
-                        allused[nowlabel].add(smt[5])
-                elif smt[0] == llvmEnum.FuncCall:
-                    alldefd[nowlabel].add(smt[1])
-                    defd[nowlabel].add(smt[1])
-                    for arg in smt[4]:
-                        if arg[1][0] in ['%', '@']:
-                            if arg[1][0] == '@':
-                                if arg[1] not in allused[nowlabel]:
-                                    defd[nowlabel].add(arg[1])
-                                alldefd[nowlabel].add(arg[1])
-                            if arg[1] not in alldefd[nowlabel]:
-                                used[nowlabel].add(arg[1])
-                            allused[nowlabel].add(arg[1])
-                elif smt[0] == llvmEnum.FuncVoid:
-                    for arg in smt[2]:
-                        if arg[1][0] in ['%', '@']:
-                            if arg[1][0] == '@':
-                                if arg[1] not in allused[nowlabel]:
-                                    defd[nowlabel].add(arg[1])
-                                alldefd[nowlabel].add(arg[1])
-                            if arg[1] not in alldefd[nowlabel]:
-                                used[nowlabel].add(arg[1])
-                            allused[nowlabel].add(arg[1])
+                    if smt[1] not in alldefd[nowlabel]:
+                        used[nowlabel].add(smt[1])
+                    allused[nowlabel].add(smt[1])
+                elif smt[0] == lrEnum.binaryi:
+                    if smt[3] not in alldefd[nowlabel]:
+                        used[nowlabel].add(smt[3])
+                    allused[nowlabel].add(smt[3])
+                    if smt[2] not in allused[nowlabel]:
+                        defd[nowlabel].add(smt[2])
+                    alldefd[nowlabel].add(smt[2])
         allin = {}
         allout = {}
         for label in alllabel:
@@ -226,360 +147,126 @@ class regalloc:
         for label in alllabel:
             liveout[label] = [set() for _ in range(len(alllabel[label]))]
             begin = True
-            nextind = 0
-            for i in range(len(alllabel[label]) - 1, 0, -1):
+            for i in range(len(alllabel[label]) - 1, -1, -1):
                 smt = alllabel[label][i]
-                if smt[0] == llvmEnum.Pass or smt[0] == llvmEnum.Phi:
-                    continue
                 if begin:
                     begin = False
-                    nextind = i
                     liveout[label][i] = allout[label]
                     continue
-                smt = alllabel[label][nextind]
-                if smt[0] == llvmEnum.Alloca:
-                    liveout[label][i] = liveout[label][nextind].copy()
-                    nextind = i
+                smt = alllabel[label][i + 1]
+                liveout[label][i] = liveout[label][i + 1].copy()
+                if smt[0] == lrEnum.mv:
                     liveout[label][i].discard(smt[1])
-                elif smt[0] == llvmEnum.Load:
-                    liveout[label][i] = liveout[label][nextind].copy()
-                    nextind = i
+                    liveout[label][i].add(smt[2])
+                elif smt[0] == lrEnum.lw:
                     liveout[label][i].discard(smt[1])
                     liveout[label][i].add(smt[3])
-                    if smt[3][0] == '@':
-                        liveout[label][i].discard(smt[3])
-                elif smt[0] == llvmEnum.Return:
-                    liveout[label][i] = liveout[label][nextind].copy()
-                    nextind = i
-                    if smt[2][0] in ['%', '@']:
-                        liveout[label][i].add(smt[2])
-                        if smt[2][0] == '@':
-                            liveout[label][i].discard(smt[2])
-                elif smt[0] == llvmEnum.Getelementptr1:
-                    liveout[label][i] = liveout[label][nextind].copy()
-                    nextind = i
+                elif smt[0] == lrEnum.binary:
+                    liveout[label][i].discard(smt[2])
+                    liveout[label][i].add(smt[3])
+                    liveout[label][i].add(smt[4])
+                elif smt[0] == lrEnum.li:
                     liveout[label][i].discard(smt[1])
-                    if smt[3][0] in ['%', '@']:
-                        liveout[label][i].add(smt[3])
-                    if smt[4][0] in ['%', '@']:
-                        liveout[label][i].add(smt[4])
-                elif smt[0] == llvmEnum.Getelementptr2:
-                    liveout[label][i] = liveout[label][nextind].copy()
-                    nextind = i
+                elif smt[0] == lrEnum.call:
+                    for reg in caller:
+                        liveout[label][i].discard(reg)
+                elif smt[0] == lrEnum.sw:
+                    liveout[label][i].add(smt[1])
+                    liveout[label][i].add(smt[3])
+                elif smt[0] == lrEnum.lui:
                     liveout[label][i].discard(smt[1])
-                    if smt[3][0] in ['%', '@']:
-                        liveout[label][i].add(smt[3])
-                    if smt[4][0] in ['%', '@']:
-                        liveout[label][i].add(smt[4])
-                elif smt[0] == llvmEnum.Jump:
-                    liveout[label][i] = liveout[label][nextind].copy()
-                    nextind = i
-                    if label in phi:
-                        for var in phi[label]:
-                            liveout[label][i].discard(var)
-                            if phi[label][var][0] in ['%', '@']:
-                                liveout[label][i].add(phi[label][var])
-                elif smt[0] == llvmEnum.Trunc:
-                    liveout[label][i] = liveout[label][nextind].copy()
-                    nextind = i
-                    liveout[label][i].discard(smt[1])
-                    if smt[2][0] in ['%', '@']:
-                        liveout[label][i].add(smt[2])
-                elif smt[0] == llvmEnum.Br:
-                    liveout[label][i] = liveout[label][nextind].copy()
-                    nextind = i
-                    if smt[1][0] in ['%', '@']:
-                        liveout[label][i].add(smt[1])
-                    if label in phi:
-                        for var in phi[label]:
-                            liveout[label][i].discard(var)
-                            if phi[label][var][0] in ['%', '@']:
-                                liveout[label][i].add(phi[label][var])
-                elif smt[0] == llvmEnum.Zext:
-                    liveout[label][i] = liveout[label][nextind].copy()
-                    nextind = i
-                    liveout[label][i].discard(smt[1])
-                    if smt[2][0] in ['%', '@']:
-                        liveout[label][i].add(smt[2])
-                elif smt[0] == llvmEnum.Icmp:
-                    liveout[label][i] = liveout[label][nextind].copy()
-                    nextind = i
-                    liveout[label][i].discard(smt[1])
-                    if smt[4][0] in ['%', '@']:
-                        liveout[label][i].add(smt[4])
-                    if smt[5][0] in ['%', '@']:
-                        liveout[label][i].add(smt[5])
-                elif smt[0] == llvmEnum.Store:
-                    liveout[label][i] = liveout[label][nextind].copy()
-                    nextind = i
-                    liveout[label][i].discard(smt[3])
-                    if smt[2][0] in ['%', '@']:
-                        liveout[label][i].add(smt[2])
-                        if smt[2][0] == '@':
-                            liveout[label][i].discard(smt[2])
-                elif smt[0] == llvmEnum.Binary:
-                    liveout[label][i] = liveout[label][nextind].copy()
-                    nextind = i
-                    liveout[label][i].discard(smt[1])
-                    if smt[4][0] in ['%', '@']:
-                        liveout[label][i].add(smt[4])
-                    if smt[5][0] in ['%', '@']:
-                        liveout[label][i].add(smt[5])
-                elif smt[0] == llvmEnum.FuncCall:
-                    liveout[label][i] = liveout[label][nextind].copy()
-                    nextind = i
-                    liveout[label][i].discard(smt[1])
-                    for arg in smt[4]:
-                        if arg[1][0] in ['%', '@']:
-                            liveout[label][i].add(arg[1])
-                            if arg[1][0] == '@':
-                                liveout[label][i].discard(arg[1])
-                elif smt[0] == llvmEnum.FuncVoid:
-                    liveout[label][i] = liveout[label][nextind].copy()
-                    nextind = i
-                    for arg in smt[2]:
-                        if arg[1][0] in ['%', '@']:
-                            liveout[label][i].add(arg[1])
-                            liveout[label][i].add(arg[1])
-                            if arg[1][0] == '@':
-                                liveout[label][i].discard(arg[1])
-                elif smt[0] == llvmEnum.ReturnVoid:
-                    liveout[label][i] = liveout[label][nextind].copy()
-                    nextind = i
+                elif smt[0] == lrEnum.icmp:
+                    liveout[label][i].discard(smt[2])
+                    liveout[label][i].add(smt[3])
+                elif smt[0] == lrEnum.bnez:
+                    liveout[label][i].add(smt[1])
+                elif smt[0] == lrEnum.binaryi:
+                    liveout[label][i].discard(smt[2])
+                    liveout[label][i].add(smt[3])
         edges = {}
-        confivar = {}
-        varsinstack = {}
         for label in alllabel:
-            if label == 'entry':
-                temp = allin[label].copy()
-                for j in range(len(function[1]) - 1, -1, -1):
-                    arg = function[1][j][1]
-                    if arg not in edges:
-                        edges[arg] = set()
-                    for var in temp:
-                        if var not in edges:
-                            edges[var] = set()
-                        edges[arg].add(var)
-                        edges[var].add(arg)
-                    temp.discard(arg)
             for i in range(len(alllabel[label])):
                 smt = alllabel[label][i]
-                if smt[0] == llvmEnum.Alloca:
+                if smt[0] == lrEnum.mv:
                     if smt[1] not in edges:
                         edges[smt[1]] = set()
                     for cri in liveout[label][i]:
                         if cri not in edges:
                             edges[cri] = set()
-                        edges[smt[1]].add(cri)
                         edges[cri].add(smt[1])
-                elif smt[0] == llvmEnum.Load:
+                        edges[smt[1]].add(cri)
+                elif smt[0] == lrEnum.lw:
                     if smt[1] not in edges:
                         edges[smt[1]] = set()
                     for cri in liveout[label][i]:
                         if cri not in edges:
                             edges[cri] = set()
-                        edges[smt[1]].add(cri)
                         edges[cri].add(smt[1])
-                    if smt[2][0] == '@':
-                        temp = liveout[label][i].copy()
-                        temp.discard(smt[1])
-                        temp.add(smt[2])
-                        if smt[2] not in edges:
-                            edges[smt[2]] = set()
-                        for cri in temp:
+                        edges[smt[1]].add(cri)
+                elif smt[0] == lrEnum.binary:
+                    if smt[2] not in edges:
+                        edges[smt[2]] = set()
+                    for cri in liveout[label][i]:
+                        if cri not in edges:
+                            edges[cri] = set()
+                        edges[cri].add(smt[2])
+                        edges[smt[2]].add(cri)
+                elif smt[0] == lrEnum.li:
+                    if smt[1] not in edges:
+                        edges[smt[1]] = set()
+                    for cri in liveout[label][i]:
+                        if cri not in edges:
+                            edges[cri] = set()
+                        edges[cri].add(smt[1])
+                        edges[smt[1]].add(cri)
+                elif smt[0] == lrEnum.call:
+                    for reg in caller:
+                        if reg not in edges:
+                            edges[reg] = set()
+                        for cri in liveout[label][i]:
                             if cri not in edges:
                                 edges[cri] = set()
-                            edges[smt[2]].add(cri)
-                            edges[cri].add(smt[2])
-                elif smt[0] == llvmEnum.Getelementptr1:
+                            edges[cri].add(reg)
+                            edges[reg].add(cri)
+                elif smt[0] == lrEnum.lui:
                     if smt[1] not in edges:
                         edges[smt[1]] = set()
                     for cri in liveout[label][i]:
                         if cri not in edges:
                             edges[cri] = set()
-                        edges[smt[1]].add(cri)
                         edges[cri].add(smt[1])
-                elif smt[0] == llvmEnum.Getelementptr2:
-                    if smt[1] not in edges:
-                        edges[smt[1]] = set()
+                        edges[smt[1]].add(cri)
+                elif smt[0] == lrEnum.icmp:
+                    if smt[2] not in edges:
+                        edges[smt[2]] = set()
                     for cri in liveout[label][i]:
                         if cri not in edges:
                             edges[cri] = set()
-                        edges[smt[1]].add(cri)
-                        edges[cri].add(smt[1])
-                elif smt[0] == llvmEnum.Jump:
-                    temp = liveout[label][i].copy()
-                    if label in phi:
-                        for var in phi[label]:
-                            if var not in edges:
-                                edges[var] = set()
-                            for cri in temp:
-                                if cri not in edges:
-                                    edges[cri] = set()
-                                edges[var].add(cri)
-                                edges[cri].add(var)
-                            temp.discard(var)
-                            if phi[label][var][0] in ['%', '@']:
-                                temp.add(phi[label][var])
-                elif smt[0] == llvmEnum.Trunc:
-                    if smt[1] not in edges:
-                        edges[smt[1]] = set()
+                        edges[cri].add(smt[2])
+                        edges[smt[2]].add(cri)
+                elif smt[0] == lrEnum.binaryi:
+                    if smt[2] not in edges:
+                        edges[smt[2]] = set()
                     for cri in liveout[label][i]:
                         if cri not in edges:
                             edges[cri] = set()
-                        edges[smt[1]].add(cri)
-                        edges[cri].add(smt[1])
-                elif smt[0] == llvmEnum.Br:
-                    temp = liveout[label][i].copy()
-                    if smt[1][0] in ['%', '@']:
-                        temp.add(smt[1])
-                    if label in phi:
-                        for var in phi[label]:
-                            if var not in edges:
-                                edges[var] = set()
-                            for cri in temp:
-                                if cri not in edges:
-                                    edges[cri] = set()
-                                edges[var].add(cri)
-                                edges[cri].add(var)
-                            temp.discard(var)
-                            if phi[label][var][0] in ['%', '@']:
-                                temp.add(phi[label][var])
-                elif smt[0] == llvmEnum.Zext:
-                    if smt[1] not in edges:
-                        edges[smt[1]] = set()
-                    for cri in liveout[label][i]:
-                        if cri not in edges:
-                            edges[cri] = set()
-                        edges[smt[1]].add(cri)
-                        edges[cri].add(smt[1])
-                elif smt[0] == llvmEnum.Icmp:
-                    if smt[1] not in edges:
-                        edges[smt[1]] = set()
-                    for cri in liveout[label][i]:
-                        if cri not in edges:
-                            edges[cri] = set()
-                        edges[smt[1]].add(cri)
-                        edges[cri].add(smt[1])
-                elif smt[0] == llvmEnum.Store:
-                    if smt[3] not in edges:
-                        edges[smt[3]] = set()
-                    for cri in liveout[label][i]:
-                        if cri not in edges:
-                            edges[cri] = set()
-                        edges[smt[3]].add(cri)
-                        edges[cri].add(smt[3])
-                    temp = liveout[label][i].copy()
-                    temp.discard(smt[3])
-                    temp.add(smt[2])
-                    if smt[3][0] == '@':
-                        if smt[3] not in edges:
-                            edges[smt[3]] = set()
-                        for cri in temp:
-                            if cri not in edges:
-                                edges[cri] = set()
-                            edges[smt[3]].add(cri)
-                            edges[cri].add(smt[3])
-                        temp.discard(smt[3])
-                    if smt[2][0] == '@':
-                        if smt[2] not in edges:
-                            edges[smt[2]] = set()
-                        for cri in temp:
-                            if cri not in edges:
-                                edges[cri] = set()
-                            edges[smt[2]].add(cri)
-                            edges[cri].add(smt[2])
-                        temp.discard(smt[2])
-                elif smt[0] == llvmEnum.Binary:
-                    if smt[1] not in edges:
-                        edges[smt[1]] = set()
-                    for cri in liveout[label][i]:
-                        if cri not in edges:
-                            edges[cri] = set()
-                        edges[smt[1]].add(cri)
-                        edges[cri].add(smt[1])
-                elif smt[0] == llvmEnum.FuncCall:
-                    if smt[1] not in edges:
-                        edges[smt[1]] = set()
-                    for cri in liveout[label][i]:
-                        if cri not in edges:
-                            edges[cri] = set()
-                        edges[smt[1]].add(cri)
-                        edges[cri].add(smt[1])
-                    temp = liveout[label][i].copy()
-                    temp.discard(smt[1])
-                    todo = []
-                    size = 0
-                    for arg in smt[4]:
-                        if arg[1][0] in ['%', '@']:
-                            if size < 8:
-                                confivar[arg[1]] = reg2use.index(f'a{size}')
-                            temp.add(arg[1])
-                            if arg[1][0] == '@':
-                                if arg[1][0] not in todo:
-                                    todo.append(arg[1])
-                        size += 1
-                    for arg in todo:
-                        if arg not in edges:
-                            edges[arg] = set()
-                        for cri in temp:
-                            if cri not in edges:
-                                edges[cri] = set()
-                            edges[arg].add(cri)
-                            edges[cri].add(arg)
-                        temp.discard(arg)
-                elif smt[0] == llvmEnum.Return:
-                    if smt[2][0] == '@':
-                        confivar[smt[2]] = reg2use.index('a0')
-                        temp = liveout[label][i].copy()
-                        temp.add(smt[2])
-                        if smt[2] not in edges:
-                            edges[smt[2]] = set()
-                        for cri in temp:
-                            if cri not in edges:
-                                edges[cri] = set()
-                            edges[smt[2]].add(cri)
-                            edges[cri].add(smt[2])
-                elif smt[0] == llvmEnum.FuncVoid:
-                    temp = liveout[label][i].copy()
-                    todo = []
-                    size = 0
-                    for arg in smt[2]:
-                        if arg[1][0] in ['%', '@']:
-                            if size < 8:
-                                confivar[arg[1]] = reg2use.index(f'a{size}')
-                            temp.add(arg[1])
-                            if arg[1][0] == '@':
-                                if arg[1][0] not in todo:
-                                    todo.append(arg[1])
-                        size += 1
-                    for arg in todo:
-                        if arg not in edges:
-                            edges[arg] = set()
-                        for cri in temp:
-                            if cri not in edges:
-                                edges[cri] = set()
-                            edges[arg].add(cri)
-                            edges[cri].add(arg)
-                        temp.discard(arg)
-        print(allout)
-        allvar = {}
+                        edges[cri].add(smt[2])
+                        edges[smt[2]].add(cri)
 
-    def make(self, array):
+    def make(self, funcname, array, dt):
+        self.varnum = 0
+        tempblock = 0
         varbank = {}
         tempconst = {}
         ret = []
-        allblock = {'entry': [[lrEnum.label, 'entry']]}
+        allblock = {'entry': [[lrEnum.label, funcname, 'entry']]}
+        alllabel = {}
         for i in range(len(array[1])):
             if i < 8:
-                varname = f"temp_{self.varnum}"
-                varbank[array[1][i][1]] = varname
-                self.varnum += 1
+                varname = self.getreg(varbank, array[1][i][1])
                 allblock['entry'].append([lrEnum.mv, varname, f'a{i}'])
             else:
-                varname = f"temp_{self.varnum}"
-                varbank[array[1][i][1]] = varname
-                self.varnum += 1
+                varname = self.getreg(varbank, array[1][i][1])
                 allblock['entry'].append([lrEnum.lw, varname, (i - 8) * 4, 'sp'])
         pre = {}
         next = {}
@@ -589,6 +276,7 @@ class regalloc:
             for smt in label:
                 if smt[0] == llvmEnum.Label:
                     nowlabel = smt[1]
+                    alllabel[nowlabel] = label
                     if nowlabel not in pre:
                         pre[nowlabel] = []
                     if nowlabel not in next:
@@ -618,7 +306,9 @@ class regalloc:
                         if nowlabel not in phi[arg[1]]:
                             phi[arg[1]][nowlabel] = []
                         phi[arg[1]][nowlabel].append([smt[1], arg[0]])
-        for label in array[2]:
+        queue = ['entry']
+        while len(queue) > 0:
+            label = alllabel[queue.pop(0)]
             nowlabel = ""
             for smt in label:
                 if smt[0] == llvmEnum.Pass:
@@ -626,7 +316,7 @@ class regalloc:
                 elif smt[0] == llvmEnum.Label:
                     nowlabel = smt[1]
                     if nowlabel not in allblock:
-                        allblock[nowlabel] = [[lrEnum.label, nowlabel]]
+                        allblock[nowlabel] = [[lrEnum.label, funcname, nowlabel]]
                     ret.append(allblock[nowlabel])
                 elif smt[0] == llvmEnum.Alloca:
                     raise Exception("No Alloca!")
@@ -636,27 +326,429 @@ class regalloc:
                     if lhscheck and rhscheck:
                         tempconst[smt[1]] = self.getvalue(smt[2], lhsvalue, rhsvalue)
                     else:
+                        varname = self.getreg(varbank, smt[1])
+                        if lhscheck:
+                            allblock[nowlabel].append([lrEnum.li, varname, lhsvalue])
+                            allblock[nowlabel].append([lrEnum.binary, binaryopt[smt[2]], varname, varname, self.getreg(varbank, smt[5])])
+                        elif rhscheck:
+                            allblock[nowlabel].append([lrEnum.binaryi, binaryopt[smt[2]] + 'i', varname, self.getreg(varbank, smt[4]), rhsvalue])
+                        else:
+                            allblock[nowlabel].append([lrEnum.binary, binaryopt[smt[2]], varname, self.getreg(varbank, smt[4]), self.getreg(varbank, smt[5])])
+                elif smt[0] == llvmEnum.Return:
+                    retvalue, retcheck = self.constcheck(tempconst, smt[2])
+                    if retcheck:
+                        allblock[nowlabel].append([lrEnum.li, 'a0', retvalue])
+                    else:
+                        if smt[2] in varbank:
+                            allblock[nowlabel].append([lrEnum.mv, 'a0', varbank[smt[2]]])
+                        else:
+                            if smt[2][0] != '@':
+                                varname = f"temp_{self.varnum}"
+                                self.varnum += 1
+                                varbank[smt[2]] = varname
+                                allblock[nowlabel].append([lrEnum.mv, 'a0', varname])
+                            else:
+                                allblock[nowlabel].append([lrEnum.lui, 'a0', arg[1][1:]])
+                                allblock[nowlabel].append([lrEnum.binaryi, 'addi', 'a0', 'a0', f'%lo({arg[1][1:]})'])
+                    allblock[nowlabel].append([lrEnum.ret])
+                elif smt[0] == llvmEnum.ReturnVoid:
+                    allblock[nowlabel].append([lrEnum.ret])
+                elif smt[0] == llvmEnum.FuncCall:
+                    for i in range(len(smt[4])):
+                        arg = smt[4][i]
+                        argvalue, argcheck = self.constcheck(tempconst, arg[1])
+                        if i < 8:
+                            if argcheck:
+                                allblock[nowlabel].append([lrEnum.li, f'a{i}', argvalue])
+                            else:
+                                if arg[1] in varbank:
+                                    allblock[nowlabel].append([lrEnum.mv, f'a{i}', varbank[arg[1]]])
+                                else:
+                                    if arg[1][0] != '@':
+                                        varname = f"temp_{self.varnum}"
+                                        self.varnum += 1
+                                        varbank[arg[1]] = varname
+                                        allblock[nowlabel].append([lrEnum.mv, f'a{i}', varname])
+                                    else:
+                                        allblock[nowlabel].append([lrEnum.lui, f'a{i}', arg[1][1:]])
+                                        allblock[nowlabel].append([lrEnum.binaryi, 'addi', f'a{i}', f'a{i}', f'%lo({arg[1][1:]})'])
+                        else:
+                            if argcheck:
+                                varname = f"temp_{self.varnum}"
+                                self.varnum += 1
+                                allblock[nowlabel].append([lrEnum.li, varname, argvalue])
+                                allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'sp'])
+                            else:
+                                if arg[1] in varbank:
+                                    allblock[nowlabel].append([lrEnum.sw, varbank[arg[1]], (i - 8) * 4, 'sp'])
+                                else:
+                                    if arg[1][0] != '@':
+                                        varname = f"temp_{self.varnum}"
+                                        self.varnum += 1
+                                        varbank[arg[1]] = varname
+                                        allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'sp'])
+                                    else:
+                                        varname = f"temp_{self.varnum}"
+                                        self.varnum += 1
+                                        allblock[nowlabel].append([lrEnum.lui, varname, arg[1][1:]])
+                                        allblock[nowlabel].append([lrEnum.binaryi, 'addi', varname, varname, f'%lo({arg[1][1:]})'])
+                                        allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'sp'])
+                    varname = self.getreg(varbank, smt[1])
+                    allblock[nowlabel].append([lrEnum.call, smt[3]])
+                    allblock[nowlabel].append([lrEnum.mv, varname, 'a0'])
+                elif smt[0] == llvmEnum.FuncVoid:
+                    for i in range(len(smt[2])):
+                        arg = smt[2][i]
+                        argvalue, argcheck = self.constcheck(tempconst, arg[1])
+                        if i < 8:
+                            if argcheck:
+                                allblock[nowlabel].append([lrEnum.li, f'a{i}', argvalue])
+                            else:
+                                if arg[1] in varbank:
+                                    allblock[nowlabel].append([lrEnum.mv, f'a{i}', varbank[arg[1]]])
+                                else:
+                                    if arg[1][0] != '@':
+                                        varname = f"temp_{self.varnum}"
+                                        self.varnum += 1
+                                        varbank[arg[1]] = varname
+                                        allblock[nowlabel].append([lrEnum.mv, f'a{i}', varname])
+                                    else:
+                                        allblock[nowlabel].append([lrEnum.lui, f'a{i}', arg[1][1:]])
+                                        allblock[nowlabel].append([lrEnum.binaryi, 'addi', f'a{i}', f'a{i}', f'%lo({arg[1][1:]})'])
+                        else:
+                            if argcheck:
+                                varname = f"temp_{self.varnum}"
+                                self.varnum += 1
+                                allblock[nowlabel].append([lrEnum.li, varname, argvalue])
+                                allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'sp'])
+                            else:
+                                if arg[1] in varbank:
+                                    allblock[nowlabel].append([lrEnum.sw, varbank[arg[1]], (i - 8) * 4, 'sp'])
+                                else:
+                                    if arg[1][0] != '@':
+                                        varname = f"temp_{self.varnum}"
+                                        self.varnum += 1
+                                        varbank[arg[1]] = varname
+                                        allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'sp'])
+                                    else:
+                                        varname = f"temp_{self.varnum}"
+                                        self.varnum += 1
+                                        allblock[nowlabel].append([lrEnum.lui, varname, arg[1][1:]])
+                                        allblock[nowlabel].append([lrEnum.binaryi, 'addi', varname, varname, f'%lo({arg[1][1:]})'])
+                                        allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'sp'])
+                    allblock[nowlabel].append([lrEnum.call, smt[1]])
+                elif smt[0] == llvmEnum.Trunc:
+                    if smt[1] in varbank:
+                        if smt[2] in tempconst:
+                            allblock[nowlabel].append([lrEnum.li, varbank[smt[1]], tempconst[smt[2]]])
+                        else:
+                            allblock[nowlabel].append([lrEnum.mv, varbank[smt[1]], self.getreg(varbank, smt[2])])
+                    else:
+                        if smt[2] in tempconst:
+                            tempconst[smt[1]] = tempconst[smt[2]]
+                        else:
+                            varbank[smt[1]] = self.getreg(varbank, smt[2])
+                elif smt[0] == llvmEnum.Zext:
+                    if smt[1] in varbank:
+                        if smt[2] in tempconst:
+                            allblock[nowlabel].append([lrEnum.li, varbank[smt[1]], tempconst[smt[2]]])
+                        else:
+                            allblock[nowlabel].append([lrEnum.mv, varbank[smt[1]], self.getreg(varbank, smt[2])])
+                    else:
+                        if smt[2] in tempconst:
+                            tempconst[smt[1]] = tempconst[smt[2]]
+                        else:
+                            varbank[smt[1]] = self.getreg(varbank, smt[2])
+                elif smt[0] == llvmEnum.Phi:
+                    if smt[1] not in varbank:
                         varname = f"temp_{self.varnum}"
                         self.varnum += 1
                         varbank[smt[1]] = varname
+                elif smt[0] == llvmEnum.Icmp:
+                    lhsvalue, lhscheck = self.constcheck(tempconst, smt[4])
+                    rhsvalue, rhscheck = self.constcheck(tempconst, smt[5])
+                    if lhscheck and rhscheck:
+                        if smt[2] == 'eq':
+                            tempconst[smt[1]] = int(lhsvalue == rhsvalue)
+                        elif smt[2] == 'ne':
+                            tempconst[smt[1]] = int(lhsvalue != rhsvalue)
+                        elif smt[2] == 'slt':
+                            tempconst[smt[1]] = int(lhsvalue < rhsvalue)
+                        elif smt[2] == 'sgt':
+                            tempconst[smt[1]] = int(lhsvalue > rhsvalue)
+                        elif smt[2] == 'sle':
+                            tempconst[smt[1]] = int(lhsvalue <= rhsvalue)
+                        elif smt[2] == 'sge':
+                            tempconst[smt[1]] = int(lhsvalue >= rhsvalue)
+                        else:
+                            raise Exception("Warning in icmp")
+                    else:
+                        varname = self.getreg(varbank, smt[1])
                         if lhscheck:
                             allblock[nowlabel].append([lrEnum.li, varname, lhsvalue])
-                            allblock[nowlabel].append([lrEnum.binary, binaryopt[smt[2]], varname, varname, varbank[smt[5]]])
+                            rhsvalue = self.getreg(varbank, smt[5])
+                            lhsvalue = varname
                         elif rhscheck:
-                            allblock[nowlabel].append([lrEnum.binary, binaryopt[smt[2]] + 'i', varname, varbank[smt[4]], rhsvalue])
+                            allblock[nowlabel].append([lrEnum.li, varname, rhsvalue])
+                            lhsvalue = self.getreg(varbank, smt[4])
+                            rhsvalue = varname
                         else:
-                            allblock[nowlabel].append([lrEnum.binary, binaryopt[smt[2]], varname, varbank[smt[4]], varbank[smt[5]]])
-                elif smt[0] == llvmEnum.Return:
-                    if smt[2] in tempconst:
-                        allblock[nowlabel].append([lrEnum.li, 'a0', tempconst[smt[2]]])
+                            lhsvalue = self.getreg(varbank, smt[4])
+                            rhsvalue = self.getreg(varbank, smt[5])
+                        if smt[2] == 'eq':
+                            allblock[nowlabel].append([lrEnum.binary, 'xor', varname, lhsvalue, rhsvalue])
+                            allblock[nowlabel].append([lrEnum.icmp, 'seqz', varname, varname])
+                        elif smt[2] == 'ne':
+                            allblock[nowlabel].append([lrEnum.binary, 'xor', varname, lhsvalue, rhsvalue])
+                            allblock[nowlabel].append([lrEnum.icmp, 'snez', varname, varname])
+                        elif smt[2] == 'slt':
+                            allblock[nowlabel].append([lrEnum.binary, 'slt', varname, lhsvalue, rhsvalue])
+                        elif smt[2] == 'sgt':
+                            allblock[nowlabel].append([lrEnum.binary, 'slt', varname, rhsvalue, lhsvalue])
+                        elif smt[2] == 'sle':
+                            allblock[nowlabel].append([lrEnum.binary, 'slt', varname, rhsvalue, lhsvalue])
+                            allblock[nowlabel].append([lrEnum.binaryi, 'xori', varname, varname, 1])
+                        elif smt[2] == 'sge':
+                            allblock[nowlabel].append([lrEnum.binary, 'slt', varname, lhsvalue, rhsvalue])
+                            allblock[nowlabel].append([lrEnum.binaryi, 'xori', varname, varname, 1])
+                        else:
+                            raise Exception("Warning in icmp")
+                elif smt[0] == llvmEnum.Getelementptr1:
+                    tarReg = self.getreg(varbank, smt[3])
+                    indvalue, indcheck = self.constcheck(tempconst, smt[4])
+                    varname = self.getreg(varbank, smt[1])
+                    if indcheck:
+                        if indvalue != 0:
+                            allblock[nowlabel].append([lrEnum.binaryi, 'addi', varname, tarReg, indvalue * 4])
+                        else:
+                            allblock[nowlabel].append([lrEnum.mv, varname, tarReg])
                     else:
-                        allblock[nowlabel].append([lrEnum.mv, 'a0', varbank[smt[2]]])
+                        allblock[nowlabel].append([lrEnum.binaryi, 'slli', varname, self.getreg(varbank, smt[4]), 2])
+                        allblock[nowlabel].append([lrEnum.binary, 'add', varname, tarReg, varname])
+                elif smt[0] == llvmEnum.Getelementptr2:
+                    tarReg = self.getreg(varbank, smt[3])
+                    indvalue, indcheck = self.constcheck(tempconst, smt[4])
+                    varname = self.getreg(varbank, smt[1])
+                    if indcheck:
+                        if indvalue != 0:
+                            allblock[nowlabel].append([lrEnum.binaryi, 'addi', varname, tarReg, indvalue * 4])
+                        else:
+                            allblock[nowlabel].append([lrEnum.mv, varname, tarReg])
+                    else:
+                        allblock[nowlabel].append([lrEnum.binaryi, 'slli', varname, self.getreg(varbank, smt[4]), 2])
+                        allblock[nowlabel].append([lrEnum.binary, 'add', varname, tarReg, varname])
+                elif smt[0] == llvmEnum.Load:
+                    if smt[3] == '@.true':
+                        tempconst[smt[1]] = 1
+                    elif smt[3] == '@.false':
+                        tempconst[smt[1]] = 0
+                    else:
+                        varname = self.getreg(varbank, smt[1])
+                        if smt[3] in varbank:
+                            allblock[nowlabel].append([lrEnum.lw, varname, 0, varbank[smt[3]]])
+                        else:
+                            if smt[3][0] != '@':
+                                raise Exception("Warning in Load at @")
+                            allblock[nowlabel].append([lrEnum.lui, varname, smt[3][1:]])
+                            allblock[nowlabel].append([lrEnum.lw, varname, f"%lo({smt[3][1:]})", varname])
+                elif smt[0] == llvmEnum.Store:
+                    varvalue, varcheck = self.constcheck(tempconst, smt[2])
+                    if varcheck:
+                        varname = f"temp_{self.varnum}"
+                        self.varnum += 1
+                        allblock[nowlabel].append([lrEnum.li, varname, varvalue])
+                    else:
+                        varname = self.getreg(varbank, smt[2])
+                    if smt[3] not in varbank:
+                        if smt[3][0] != "@":
+                            tarReg = f"temp_{self.varnum}"
+                            self.varnum += 1
+                            varbank[smt[3]] = tarReg
+                            allblock[nowlabel].append([lrEnum.sw, varname, 0, tarReg])
+                        else:
+                            tarReg = f"temp_{self.varnum}"
+                            self.varnum += 1
+                            allblock[nowlabel].append([lrEnum.lui, tarReg, smt[3][1:]])
+                            allblock[nowlabel].append([lrEnum.sw, varname, f"%lo({smt[3][1:]})", tarReg])
+                    else:
+                        allblock[nowlabel].append([lrEnum.sw, varname, 0, varbank[smt[3]]])
+                elif smt[0] == llvmEnum.Jump:
+                    if (nowlabel in phi) and (smt[1] in phi[nowlabel]):
+                        phibank = {}
+                        for arg in phi[nowlabel][smt[1]]:
+                            if arg[1] not in phibank:
+                                varvalue, varcheck = self.constcheck(tempconst, arg[1])
+                                if varcheck:
+                                    tarReg = self.getreg(varbank, arg[0])
+                                    allblock[nowlabel].append([lrEnum.li, tarReg, varvalue])
+                                else:
+                                    if arg[1] in varbank:
+                                        varname = varbank[arg[1]]
+                                        phibank[arg[1]] = varname
+                                    else:
+                                        if arg[1][0] != '@':
+                                            tempvar = self.getreg(varbank, arg[1])
+                                            varname = f"temp_{self.varnum}"
+                                            self.varnum += 1
+                                            phibank[arg[1]] = varname
+                                            allblock[nowlabel].append([lrEnum.mv, varname, tempvar])
+                                        else:
+                                            tarReg = self.getreg(varbank, arg[0])
+                                            allblock[nowlabel].append([lrEnum.lui, tarReg, arg[1][1:]])
+                                            allblock[nowlabel].append([lrEnum.binaryi, 'addi', tarReg, tarReg, f'%lo({arg[1][1:]})'])
+                        for arg in phi[nowlabel][smt[1]]:
+                            if arg[1] in phibank:
+                                tarReg = self.getreg(varbank, arg[0])
+                                allblock[nowlabel].append([lrEnum.mv, tarReg, phibank[arg[1]]])
+                    allblock[nowlabel].append([lrEnum.j, funcname, smt[1]])
+                elif smt[0] == llvmEnum.Br:
+                    brvalue, brcheck = self.constcheck(tempconst, smt[1])
+                    if brcheck:
+                        if brvalue == 1:
+                            if nowlabel in phi and smt[2] in phi[nowlabel]:
+                                phibank = {}
+                                for arg in phi[nowlabel][smt[2]]:
+                                    if arg[1] not in phibank:
+                                        varvalue, varcheck = self.constcheck(tempconst, arg[1])
+                                        if varcheck:
+                                            tarReg = self.getreg(varbank, arg[0])
+                                            allblock[nowlabel].append([lrEnum.li, tarReg, varvalue])
+                                        else:
+                                            if arg[1] in varbank:
+                                                varname = varbank[arg[1]]
+                                                phibank[arg[1]] = varname
+                                            else:
+                                                if arg[1][0] != '@':
+                                                    tempvar = self.getreg(varbank, arg[1])
+                                                    varname = f"temp_{self.varnum}"
+                                                    self.varnum += 1
+                                                    phibank[arg[1]] = varname
+                                                    allblock[nowlabel].append([lrEnum.mv, varname, tempvar])
+                                                else:
+                                                    tarReg = self.getreg(varbank, arg[0])
+                                                    allblock[nowlabel].append([lrEnum.lui, tarReg, arg[1][1:]])
+                                                    allblock[nowlabel].append([lrEnum.binaryi, 'addi', tarReg, tarReg, f'%lo({arg[1][1:]})'])
+                                for arg in phi[nowlabel][smt[2]]:
+                                    if arg[1] in phibank:
+                                        tarReg = self.getreg(varbank, arg[0])
+                                        allblock[nowlabel].append([lrEnum.mv, tarReg, phibank[arg[1]]])
+                            allblock[nowlabel].append([lrEnum.j, funcname, smt[2]])
+                        elif brvalue == 0:
+                            if nowlabel in phi and smt[3] in phi[nowlabel]:
+                                phibank = {}
+                                for arg in phi[nowlabel][smt[3]]:
+                                    if arg[1] not in phibank:
+                                        varvalue, varcheck = self.constcheck(tempconst, arg[1])
+                                        if varcheck:
+                                            tarReg = self.getreg(varbank, arg[0])
+                                            allblock[nowlabel].append([lrEnum.li, tarReg, varvalue])
+                                        else:
+                                            if arg[1] in varbank:
+                                                varname = varbank[arg[1]]
+                                                phibank[arg[1]] = varname
+                                            else:
+                                                if arg[1][0] != '@':
+                                                    tempvar = self.getreg(varbank, arg[1])
+                                                    varname = f"temp_{self.varnum}"
+                                                    self.varnum += 1
+                                                    phibank[arg[1]] = varname
+                                                    allblock[nowlabel].append([lrEnum.mv, varname, tempvar])
+                                                else:
+                                                    tarReg = self.getreg(varbank, arg[0])
+                                                    allblock[nowlabel].append([lrEnum.lui, tarReg, arg[1][1:]])
+                                                    allblock[nowlabel].append([lrEnum.binaryi, 'addi', tarReg, tarReg, f'%lo({arg[1][1:]})'])
+                                for arg in phi[nowlabel][smt[3]]:
+                                    if arg[1] in phibank:
+                                        tarReg = self.getreg(varbank, arg[0])
+                                        allblock[nowlabel].append([lrEnum.mv, tarReg, phibank[arg[1]]])
+                            allblock[nowlabel].append([lrEnum.j, funcname, smt[3]])
+                        else:
+                            raise Exception("Warning in Br")
+                    else:
+                        brReg = self.getreg(varbank, smt[1])
+                        if nowlabel in phi and smt[2] in phi[nowlabel]:
+                            lhslabel = f"phiblock_{tempblock}"
+                            tempblock += 1
+                            newblock1 = [[lrEnum.label, funcname, lhslabel]]
+                            phibank = {}
+                            for arg in phi[nowlabel][smt[2]]:
+                                if arg[1] not in phibank:
+                                    varvalue, varcheck = self.constcheck(tempconst, arg[1])
+                                    if varcheck:
+                                        tarReg = self.getreg(varbank, arg[0])
+                                        newblock1.append([lrEnum.li, tarReg, varvalue])
+                                    else:
+                                        if arg[1] in varbank:
+                                            varname = varbank[arg[1]]
+                                            phibank[arg[1]] = varname
+                                        else:
+                                            if arg[1][0] != '@':
+                                                tempvar = self.getreg(varbank, arg[1])
+                                                varname = f"temp_{self.varnum}"
+                                                self.varnum += 1
+                                                phibank[arg[1]] = varname
+                                                newblock1.append([lrEnum.mv, varname, tempvar])
+                                            else:
+                                                tarReg = self.getreg(varbank, arg[0])
+                                                newblock1.append([lrEnum.lui, tarReg, arg[1][1:]])
+                                                newblock1.append([lrEnum.binaryi, 'addi', tarReg, tarReg, f'%lo({arg[1][1:]})'])
+                            for arg in phi[nowlabel][smt[2]]:
+                                if arg[1] in phibank:
+                                    tarReg = self.getreg(varbank, arg[0])
+                                    newblock1.append([lrEnum.mv, tarReg, phibank[arg[1]]])
+                            newblock1.append([lrEnum.j, funcname, smt[2]])
+                            ret.append(newblock1)
+                        else:
+                            lhslabel = smt[2]
+                        allblock[nowlabel].append([lrEnum.bnez, brReg, funcname, lhslabel])
+                        if nowlabel in phi and smt[3] in phi[nowlabel]:
+                            rhslabel = f"phiblock_{tempblock}"
+                            tempblock += 1
+                            newblock2 = [[lrEnum.label, funcname, rhslabel]]
+                            phibank = {}
+                            for arg in phi[nowlabel][smt[3]]:
+                                if arg[1] not in phibank:
+                                    varvalue, varcheck = self.constcheck(tempconst, arg[1])
+                                    if varcheck:
+                                        tarReg = self.getreg(varbank, arg[0])
+                                        newblock2.append([lrEnum.li, tarReg, varvalue])
+                                    else:
+                                        if arg[1] in varbank:
+                                            varname = varbank[arg[1]]
+                                            phibank[arg[1]] = varname
+                                        else:
+                                            if arg[1][0] != '@':
+                                                tempvar = self.getreg(varbank, arg[1])
+                                                varname = f"temp_{self.varnum}"
+                                                self.varnum += 1
+                                                phibank[arg[1]] = varname
+                                                newblock2.append([lrEnum.mv, varname, tempvar])
+                                            else:
+                                                tarReg = self.getreg(varbank, arg[0])
+                                                newblock2.append([lrEnum.lui, tarReg, arg[1][1:]])
+                                                newblock2.append([lrEnum.binaryi, 'addi', tarReg, tarReg, f'%lo({arg[1][1:]})'])
+                            for arg in phi[nowlabel][smt[3]]:
+                                if arg[1] in phibank:
+                                    tarReg = self.getreg(varbank, arg[0])
+                                    newblock2.append([lrEnum.mv, tarReg, phibank[arg[1]]])
+                            newblock2.append([lrEnum.j, funcname, smt[3]])
+                            ret.append(newblock2)
+                        else:
+                            rhslabel = smt[3]
+                        allblock[nowlabel].append([lrEnum.j, funcname, rhslabel])
                 else:
-                    print(smt)
-        print(ret)
+                    raise Exception("Warning")
+            for suc in dt[nowlabel]:
+                queue.append(suc)
         return ret
 
     def constcheck(self, tempconst, var):
+        if var == 'true':
+            return 1, True
+        if var == 'false':
+            return 0, True
+        if var == 'null':
+            return 0, True
         if var.isdigit() or var[1:].isdigit():
             return int(var), True
         if var in tempconst:
@@ -684,3 +776,11 @@ class regalloc:
             return lhs ^ rhs
         if op == 'or':
             return lhs | rhs
+
+    def getreg(self, varbank, var):
+        if var in varbank:
+            return varbank[var]
+        varname = f"temp_{self.varnum}"
+        self.varnum += 1
+        varbank[var] = varname
+        return varname
