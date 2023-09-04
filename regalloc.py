@@ -10,12 +10,43 @@ binaryopt = {'mul': 'mul', 'sdiv': 'div', 'add': 'add', 'sub': 'sub', 'srem': 'r
 class regalloc:
     def __init__(self):
         self.varnum = 0
+        self.needra = False
+
+    def mvrelated(self, name, movelist, activemMove, mvlib):
+        if name not in movelist:
+            return False
+        for mv in movelist[name]:
+            if mv in activemMove or mv in mvlib:
+                return True
+        return False
 
     def translate(self, globalvars, allfunc, dt):
         ir = {}
         for function in allfunc:
+
             ir[function] = self.make(function, allfunc[function], dt[function])
-            self.staticAnalyze(ir[function])
+            while True:
+                mvlib, movelist, graph = self.staticAnalyze(ir[function])
+                selectStack = []
+                coalescedNodes = {}
+                coalescedMove = []
+                constrainedMove = []
+                frozenlist = []
+                activemMove = []
+                spillworklist, freezeworklist, simplifyworklist = self.makeworklist(mvlib, graph, movelist, activemMove)
+
+                while not (len(simplifyworklist) == 0 and len(freezeworklist) == 0 and len(spillworklist) == 0 and len(mvlib) == 0):
+                    if len(simplifyworklist) != 0:
+                        self.simplify(simplifyworklist, selectStack, mvlib, movelist, graph, activemMove, coalescedNodes, spillworklist,
+                                      freezeworklist)
+                    elif len(mvlib) != 0:
+                        self.coalesce(spillworklist, selectStack, mvlib, movelist, graph, activemMove, constrainedMove, coalescedMove,
+                                      coalescedNodes, freezeworklist, simplifyworklist)
+                    elif len(freezeworklist) != 0:
+                        self.freeze(freezeworklist, simplifyworklist, movelist, mvlib, activemMove, coalescedNodes, frozenlist, graph)
+                    elif len(spillworklist) != 0:
+                        self.selectspill()
+                break
 
     def staticAnalyze(self, function):
         pre = {}
@@ -29,6 +60,7 @@ class regalloc:
         alllabel = {}
         needra = False
         mvlib = []
+        mvlist = {}
         for label in function:
             for smt in label:
                 if smt[0] == lrEnum.label:
@@ -44,6 +76,12 @@ class regalloc:
                     allused[nowlabel] = set()
                 elif smt[0] == lrEnum.mv:
                     mvlib.append([smt[1], smt[2]])
+                    if smt[1] not in mvlist:
+                        mvlist[smt[1]] = []
+                    mvlist[smt[1]].append([smt[1], smt[2]])
+                    if smt[2] not in mvlist:
+                        mvlist[smt[2]] = []
+                    mvlist[smt[2]].append([smt[1], smt[2]])
                     if smt[2] not in alldefd[nowlabel]:
                         used[nowlabel].add(smt[2])
                     allused[nowlabel].add(smt[2])
@@ -74,7 +112,7 @@ class regalloc:
                 elif smt[0] == lrEnum.ret:
                     continue
                 elif smt[0] == lrEnum.call:
-                    needra = True
+                    self.needra = True
                     for reg in caller:
                         if reg not in allused[nowlabel]:
                             defd[nowlabel].add(reg)
@@ -252,6 +290,12 @@ class regalloc:
                             edges[cri] = set()
                         edges[cri].add(smt[2])
                         edges[smt[2]].add(cri)
+        for reg in edges:
+            edges[reg].discard(reg)
+            edges[reg].discard('sp')
+        if 'sp' in edges:
+            edges.pop('sp')
+        return mvlib, mvlist, edges
 
     def make(self, funcname, array, dt):
         self.varnum = 0
@@ -308,7 +352,10 @@ class regalloc:
                         phi[arg[1]][nowlabel].append([smt[1], arg[0]])
         queue = ['entry']
         while len(queue) > 0:
-            label = alllabel[queue.pop(0)]
+            name = queue.pop(0)
+            if name not in alllabel:
+                continue
+            label = alllabel[name]
             nowlabel = ""
             for smt in label:
                 if smt[0] == llvmEnum.Pass:
@@ -784,3 +831,185 @@ class regalloc:
         self.varnum += 1
         varbank[var] = varname
         return varname
+
+    def makeworklist(self, mvlib, graph, movelist, activemMove):
+        spillworklist = []
+        freezeworklist = []
+        simplifyworklist = []
+        for i in range(self.varnum):
+            varname = f"temp_{i}"
+            if varname in graph:
+                degree = len(graph[varname])
+            else:
+                degree = 0
+            if degree >= len(reg2use):
+                spillworklist.append(varname)
+            elif self.mvrelated(varname, movelist, activemMove, mvlib):
+                freezeworklist.append(varname)
+            else:
+                simplifyworklist.append(varname)
+        return spillworklist, freezeworklist, simplifyworklist
+
+    def simplify(self, simplifyworklist, selectStack, mvlib, movelist, graph, activemMove, coalescedNodes, spillworklist, freezeworklist):
+        tosimplify = simplifyworklist.pop(0)
+        selectStack.append(tosimplify)
+        if tosimplify in graph:
+            for suc in graph[tosimplify]:
+                if suc not in selectStack and suc not in coalescedNodes:
+                    graph[suc].discard(tosimplify)
+                    degree = len(graph[suc])
+                    if degree == len(reg2use) - 1:
+                        for sucsuc in graph[suc]:
+                            if sucsuc not in selectStack and sucsuc not in coalescedNodes and sucsuc in movelist:
+                                for m in movelist[sucsuc]:
+                                    if m in activemMove:
+                                        activemMove.remove(m)
+                                        mvlib.append(m)
+                        spillworklist.remove(suc)
+                        if self.mvrelated(suc, movelist, activemMove, mvlib):
+                            if suc not in freezeworklist:
+                                freezeworklist.append(suc)
+                        else:
+                            if suc not in simplifyworklist:
+                                simplifyworklist.append(suc)
+            graph.pop(tosimplify)
+
+    def coalesce(self, spillworklist, selectStack, mvlib, movelist, graph, activemMove, constrainedMove, coalescedMove, coalescedNodes,
+                 freezeworklist, simplifyworklist):
+        tocoalesce = mvlib.pop(0)
+        x = self.alias(coalescedNodes, tocoalesce[0])
+        y = self.alias(coalescedNodes, tocoalesce[1])
+        if y in reg2use:
+            u, v = y, x
+        else:
+            u, v = x, y
+        if u == v:
+            coalescedMove.append(tocoalesce)
+            self.addWork(u, graph, freezeworklist, simplifyworklist, movelist, activemMove, mvlib)
+        elif v in reg2use or (u in graph and v in graph[u]):
+            constrainedMove.append(tocoalesce)
+            self.addWork(u, graph, freezeworklist, simplifyworklist, movelist, activemMove, mvlib)
+            self.addWork(v, graph, freezeworklist, simplifyworklist, movelist, activemMove, mvlib)
+        elif u in reg2use:
+            if v not in graph:
+                graph[v] = set()
+            flag = True
+            for t in graph[v]:
+                if t not in selectStack and t not in coalescedNodes:
+                    if t in graph:
+                        degree = len(graph[t])
+                    else:
+                        degree = 0
+                    flag = flag and (degree < len(reg2use) or t in reg2use or (u in graph and t in graph[u]))
+            if flag:
+                coalescedMove.append(tocoalesce)
+                self.Combine(graph, u, v, freezeworklist, spillworklist, coalescedNodes, activemMove, mvlib, movelist, selectStack, simplifyworklist)
+                self.addWork(u, graph, freezeworklist, simplifyworklist, movelist, activemMove, mvlib)
+            else:
+                activemMove.append(tocoalesce)
+        else:
+            newnode = set()
+            num = 0
+            if u in graph:
+                for suc in graph[u]:
+                    if suc not in selectStack and suc not in coalescedNodes:
+                        newnode.add(suc)
+            if v in graph:
+                for suc in graph[v]:
+                    if suc not in selectStack and suc not in coalescedNodes:
+                        newnode.add(suc)
+            for node in newnode:
+                if node not in graph:
+                    degree = 0
+                else:
+                    degree = len(graph[node])
+                if degree >= len(reg2use):
+                    num += 1
+            if num < len(reg2use):
+                coalescedMove.append(tocoalesce)
+                self.Combine(graph, u, v, freezeworklist, spillworklist, coalescedNodes, activemMove, mvlib, movelist, selectStack, simplifyworklist)
+                self.addWork(u, graph, freezeworklist, simplifyworklist, movelist, activemMove, mvlib)
+            else:
+                activemMove.append(tocoalesce)
+
+    def alias(self, coalescedNodes, name):
+        if name in coalescedNodes:
+            return self.alias(coalescedNodes, coalescedNodes[name])
+        else:
+            return name
+
+    def addWork(self, name, graph, freezeworklist, simplifyworklist, movelist, activemMove, mvlib):
+        if name not in reg2use and not (self.mvrelated(name, movelist, activemMove, mvlib)):
+            if name in graph:
+                degree = len(graph[name])
+            else:
+                degree = 0
+            if degree < len(reg2use):
+                if name not in simplifyworklist:
+                    simplifyworklist.append(name)
+                if name in freezeworklist:
+                    freezeworklist.remove(name)
+
+    def Combine(self, graph, u, v, freezeworklist, spillworklist, coalescedNodes, activemMove, mvlib, movelist, selectStack, simplifyworklist):
+        if v in freezeworklist:
+            freezeworklist.remove(v)
+        else:
+            spillworklist.remove(v)
+        coalescedNodes[v] = u
+        for mv in movelist[v]:
+            movelist[u].append(mv)
+        for m in movelist[v]:
+            if m in activemMove:
+                activemMove.remove(m)
+                mvlib.append(m)
+        if u not in graph:
+            graph[u] = set()
+        for t in graph[v]:
+            graph[t].add(u)
+            graph[t].discard(v)
+            graph[u].add(t)
+            degree = len(graph[t])
+            if degree == len(reg2use) - 1:
+                for sucsuc in graph[t]:
+                    if sucsuc not in selectStack and sucsuc not in coalescedNodes and sucsuc in movelist:
+                        for m in movelist[sucsuc]:
+                            if m in activemMove:
+                                activemMove.remove(m)
+                                mvlib.append(m)
+                if t in spillworklist:
+                    spillworklist.remove(t)
+                if self.mvrelated(t, movelist, activemMove, mvlib):
+                    if t not in freezeworklist:
+                        freezeworklist.append(t)
+                else:
+                    if t not in simplifyworklist:
+                        simplifyworklist.append(t)
+        graph.pop(v)
+        degree = len(graph[u])
+        if degree >= len(reg2use):
+            if u in freezeworklist:
+                freezeworklist.remove(u)
+            if u not in spillworklist:
+                spillworklist.append(u)
+
+    def freeze(self, freezeworklist, simplifyworklist, movelist, mvlib, activemMove, coalescedNodes, frozenlist, graph):
+        u = freezeworklist.pop(0)
+        if u not in simplifyworklist:
+            simplifyworklist.append(u)
+        for m in movelist[u]:
+            if m in activemMove or m in mvlib:
+                x, y = m[0], m[1]
+                if self.alias(coalescedNodes, y) == self.alias(coalescedNodes, u):
+                    v = self.alias(coalescedNodes, x)
+                else:
+                    v = self.alias(coalescedNodes, y)
+                activemMove.remove(m)
+                frozenlist.append(m)
+                if v in graph:
+                    degree = len(graph[v])
+                else:
+                    degree = 0
+                if self.mvrelated(v, movelist, activemMove, mvlib) and degree < len(reg2use):
+                    freezeworklist.remove(v)
+                    if v not in simplifyworklist:
+                        simplifyworklist.append(v)
