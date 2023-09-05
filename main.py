@@ -3680,11 +3680,11 @@ declare ptr @malloc(i32)
     #     for func in self.llvmfunc:
     #         self.translator.translatefunction(func, self.llvmfunc[func])
     #     self.translator.write()
-    def riscv(self):
+    def riscv(self, flag):
         maxarg = 0
         for func in self.llvmfunc:
             maxarg = max(maxarg, len(self.llvmfunc[func][1]) - 8)
-        self.translator.translate(self.globalvars, self.llvmfunc, self.dt)
+        self.translator.translate(self.globalvars, self.llvmfunc, self.dt, flag)
 
     def Mem2Reg(self):
         self.dt = self.mem2reg.run(self.llvmfunc)
@@ -3738,44 +3738,44 @@ if __name__ == "__main__":
     #             f5.close()
     #             print(('Verdict: Success\n' in content) == flag)
 
-    # if sys.argv[1] == "-fsyntax-only":
-    #     sys.stdin = codecs.getreader('utf-8')(sys.stdin)
-    #     input_stream = StdinStream(encoding='utf-8')
-    #     try:
-    #         lexer = helloLexer(input_stream)
-    #         lexer._listeners = [MyErrorListener()]
-    #         stream = CommonTokenStream(lexer)
-    #         parser = helloParser(stream)
-    #         parser._listeners = [MyErrorListener()]
-    #         cst = parser.body()
-    #         builder = ASTBuilder()
-    #         ast = builder.build(cst)
-    #         flag = builder.check(ast)
-    #     except Exception as e:
-    #         flag = False
-    #     if not flag:
-    #         sys.exit(-1)
-    # if sys.argv[1] == "-S":
-    #     sys.stdin = codecs.getreader('utf-8')(sys.stdin)
-    #     input_stream = StdinStream(encoding='utf-8')
-    #     try:
-    #         output = open('output.ll', 'w')
-    #         lexer = helloLexer(input_stream)
-    #         lexer._listeners = [MyErrorListener()]
-    #         stream = CommonTokenStream(lexer)
-    #         parser = helloParser(stream)
-    #         parser._listeners = [MyErrorListener()]
-    #         cst = parser.body()
-    #         builder = ASTBuilder()
-    #         ast = builder.build(cst)
-    #         flag = builder.check(ast)
-    #         builder.llvm(ast)
-    #         output.flush()
-    #         builder.riscv()
-    #     except Exception as e:
-    #         flag = False
-    #     if not flag:
-    #         sys.exit(-1)
+    if sys.argv[1] == "-fsyntax-only":
+        sys.stdin = codecs.getreader('utf-8')(sys.stdin)
+        input_stream = StdinStream(encoding='utf-8')
+        try:
+            lexer = helloLexer(input_stream)
+            lexer._listeners = [MyErrorListener()]
+            stream = CommonTokenStream(lexer)
+            parser = helloParser(stream)
+            parser._listeners = [MyErrorListener()]
+            cst = parser.body()
+            builder = ASTBuilder()
+            ast = builder.build(cst)
+            flag = builder.check(ast)
+        except Exception as e:
+            flag = False
+        if not flag:
+            sys.exit(-1)
+    if sys.argv[1] == "-S":
+        sys.stdin = codecs.getreader('utf-8')(sys.stdin)
+        input_stream = StdinStream(encoding='utf-8')
+        try:
+            output = open('output.ll', 'w')
+            lexer = helloLexer(input_stream)
+            lexer._listeners = [MyErrorListener()]
+            stream = CommonTokenStream(lexer)
+            parser = helloParser(stream)
+            parser._listeners = [MyErrorListener()]
+            cst = parser.body()
+            builder = ASTBuilder()
+            ast = builder.build(cst)
+            flag = builder.check(ast)
+            builder.llvm(ast)
+            output.flush()
+            builder.riscv(True)
+        except Exception as e:
+            flag = False
+        if not flag:
+            sys.exit(-1)
 
     # root = os.listdir(sys.argv[1])
     # for files in root:
@@ -3852,7 +3852,7 @@ if __name__ == "__main__":
     # print(flag)
     # builder.llvm(ast)
     # output.close()
-    # builder.riscv()
+    # builder.riscv(False)
     # input_data, output_data, exitcode = extract_input_output_exitcode(r"C:\Users\14908\Desktop\PPCA\Compiler\test.txt")
     # temp = open('test.in', 'w')
     # temp.write(input_data)
@@ -3862,81 +3862,81 @@ if __name__ == "__main__":
     # stdout, _ = process.communicate()
     # print(stdout.strip(), process.returncode)
 
-    root = os.listdir(sys.argv[1])
-    for files in root:
-        if files[-3:] == '.mx' or files[-3:] == '.mt':
-            input_data, output_data, exitcode = extract_input_output_exitcode(sys.argv[1] + '\\' + files)
-            temp = open('test.in', 'w')
-            temp.write(input_data)
-            temp.flush()
-            try:
-                print('|' + files + '|', end='')
-                output = open('output.ll', 'w')
-                input_stream = FileStream(sys.argv[1] + '\\' + files, encoding="utf-8")
-                lexer = helloLexer(input_stream)
-                lexer._listeners = [MyErrorListener()]
-                stream = CommonTokenStream(lexer)
-                parser = helloParser(stream)
-                parser._listeners = [MyErrorListener()]
-                cst = parser.body()
-                builder = ASTBuilder()
-                ast = builder.build(cst)
-                flag = builder.check(ast)
-                builder.llvm(ast)
-                output.flush()
-                builder.riscv()
-                commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && ./ravel_test --input-file=test.in --output-file=test.out test.s builtin.s"'
-                process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
-                stdout, _ = process.communicate()
-                outfile = open('test.out', 'r')
-                content = outfile.read()
-                outfile.close()
-                content = content.strip()
-                ec, t = extract_exitcode_time(stdout)
-                print(content == output_data, '|', int(ec) == int(exitcode.strip()), '|', t, '|')
-            except Exception as e:
-                flag = False
-        elif files[-3:] == 'txt':
-            continue
-        elif files[-3:] == 'cpp':
-            continue
-        elif files[-2:] == '.c':
-            continue
-        elif files[-3:] == 'csv':
-            continue
-        elif files[-3:] == '.py':
-            continue
-        else:
-            subfile = os.listdir(sys.argv[1] + '\\' + files)
-            for file in subfile:
-                input_data, output_data, exitcode = extract_input_output_exitcode(sys.argv[1] + '\\' + files + '\\' + file)
-                temp = open('test.in', 'w')
-                temp.write(input_data)
-                temp.flush()
-                try:
-                    print('|' + file + '|', end='')
-                    output = open('output.ll', 'w')
-                    input_stream = FileStream(sys.argv[1] + '\\' + files + '\\' + file, encoding="utf-8")
-                    lexer = helloLexer(input_stream)
-                    lexer._listeners = [MyErrorListener()]
-                    stream = CommonTokenStream(lexer)
-                    parser = helloParser(stream)
-                    parser._listeners = [MyErrorListener()]
-                    cst = parser.body()
-                    builder = ASTBuilder()
-                    ast = builder.build(cst)
-                    flag = builder.check(ast)
-                    builder.llvm(ast)
-                    output.flush()
-                    builder.riscv()
-                    commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && ./ravel_test --input-file=test.in --output-file=test.out test.s builtin.s"'
-                    process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
-                    stdout, _ = process.communicate()
-                    outfile = open('test.out', 'r')
-                    content = outfile.read()
-                    outfile.close()
-                    content = content.strip()
-                    ec, t = extract_exitcode_time(stdout)
-                    print(content == output_data, '|', int(ec) == int(exitcode.strip()), '|', t, '|')
-                except Exception as e:
-                    flag = False
+    # root = os.listdir(sys.argv[1])
+    # for files in root:
+    #     if files[-3:] == '.mx' or files[-3:] == '.mt':
+    #         input_data, output_data, exitcode = extract_input_output_exitcode(sys.argv[1] + '\\' + files)
+    #         temp = open('test.in', 'w')
+    #         temp.write(input_data)
+    #         temp.flush()
+    #         try:
+    #             print('|' + files + '|', end='')
+    #             output = open('output.ll', 'w')
+    #             input_stream = FileStream(sys.argv[1] + '\\' + files, encoding="utf-8")
+    #             lexer = helloLexer(input_stream)
+    #             lexer._listeners = [MyErrorListener()]
+    #             stream = CommonTokenStream(lexer)
+    #             parser = helloParser(stream)
+    #             parser._listeners = [MyErrorListener()]
+    #             cst = parser.body()
+    #             builder = ASTBuilder()
+    #             ast = builder.build(cst)
+    #             flag = builder.check(ast)
+    #             builder.llvm(ast)
+    #             output.flush()
+    #             builder.riscv()
+    #             commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && ./ravel_test --input-file=test.in --output-file=test.out test.s builtin.s"'
+    #             process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
+    #             stdout, _ = process.communicate()
+    #             outfile = open('test.out', 'r')
+    #             content = outfile.read()
+    #             outfile.close()
+    #             content = content.strip()
+    #             ec, t = extract_exitcode_time(stdout)
+    #             print(content == output_data, '|', int(ec) == int(exitcode.strip()), '|', t, '|')
+    #         except Exception as e:
+    #             flag = False
+    #     elif files[-3:] == 'txt':
+    #         continue
+    #     elif files[-3:] == 'cpp':
+    #         continue
+    #     elif files[-2:] == '.c':
+    #         continue
+    #     elif files[-3:] == 'csv':
+    #         continue
+    #     elif files[-3:] == '.py':
+    #         continue
+    #     else:
+    #         subfile = os.listdir(sys.argv[1] + '\\' + files)
+    #         for file in subfile:
+    #             input_data, output_data, exitcode = extract_input_output_exitcode(sys.argv[1] + '\\' + files + '\\' + file)
+    #             temp = open('test.in', 'w')
+    #             temp.write(input_data)
+    #             temp.flush()
+    #             try:
+    #                 print('|' + file + '|', end='')
+    #                 output = open('output.ll', 'w')
+    #                 input_stream = FileStream(sys.argv[1] + '\\' + files + '\\' + file, encoding="utf-8")
+    #                 lexer = helloLexer(input_stream)
+    #                 lexer._listeners = [MyErrorListener()]
+    #                 stream = CommonTokenStream(lexer)
+    #                 parser = helloParser(stream)
+    #                 parser._listeners = [MyErrorListener()]
+    #                 cst = parser.body()
+    #                 builder = ASTBuilder()
+    #                 ast = builder.build(cst)
+    #                 flag = builder.check(ast)
+    #                 builder.llvm(ast)
+    #                 output.flush()
+    #                 builder.riscv()
+    #                 commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && ./ravel_test --input-file=test.in --output-file=test.out test.s builtin.s"'
+    #                 process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
+    #                 stdout, _ = process.communicate()
+    #                 outfile = open('test.out', 'r')
+    #                 content = outfile.read()
+    #                 outfile.close()
+    #                 content = content.strip()
+    #                 ec, t = extract_exitcode_time(stdout)
+    #                 print(content == output_data, '|', int(ec) == int(exitcode.strip()), '|', t, '|')
+    #             except Exception as e:
+    #                 flag = False

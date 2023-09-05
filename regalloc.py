@@ -22,10 +22,13 @@ class regalloc:
                 return True
         return False
 
-    def translate(self, globalvars, allfunc, dt):
+    def translate(self, globalvars, allfunc, dt, out):
         ir = {}
         output = open("test.s", 'w')
-        output.write('\t.text\n')
+        if out:
+            print('\t.text')
+        else:
+            output.write('\t.text\n')
         for function in allfunc:
             ir[function] = self.make(function, allfunc[function], dt[function])
             while True:
@@ -58,10 +61,19 @@ class regalloc:
                 break
             for reg in reg2use:
                 coloredNode[reg] = reg2use.index(reg)
-            self.writefunction(output, function, ir[function], coloredNode, coalescedNodes)
-        output.write('\t.data\n')
+            if out:
+                self.printfunction(function, ir[function], coloredNode, coalescedNodes)
+            else:
+                self.writefunction(output, function, ir[function], coloredNode, coalescedNodes)
+        if out:
+            print('\t.data')
+        else:
+            output.write('\t.data\n')
         for var in globalvars:
-            self.writeglobalvar(output, var)
+            if out:
+                self.printglobalvar(var)
+            else:
+                self.writeglobalvar(output, var)
         output.flush()
 
     def staticAnalyze(self, function):
@@ -1286,6 +1298,83 @@ class regalloc:
                         output.write(f"\t{smt[1]}\t{reg2use[coloredNode[x]]},\t{reg2use[coloredNode[y]]},\t{smt[4]}\n")
             output.write('\n')
 
+    def printfunction(self, funcname, function, coloredNode, coalescedNodes):
+        print(f"\t.globl {funcname}\n{funcname}:\t\t# @{funcname}")
+        sp = 0
+        save = []
+        sp = self.needra + self.spillnum + self.funcarg
+        temp = set()
+        for reg in coloredNode:
+            if reg not in reg2use and reg2use[coloredNode[reg]] in callee:
+                temp.add(coloredNode[reg])
+        sp += len(temp)
+        sp = 4 * ((sp + 3) & ~3)
+        save = list(temp)
+        if sp != 0:
+            print(f"\taddi\tsp,\tsp,\t{-sp}")
+        if self.needra:
+            print(f"\tsw\tra\t{sp - 4}(sp)")
+        for reg in range(len(save)):
+            print(f"\tsw\t{reg2use[save[reg]]}\t{sp - 4 * (self.needra + self.spillnum) - 4 * (reg + 1)}(sp)")
+        for label in function:
+            for smt in label:
+                if smt[0] == lrEnum.mv:
+                    x, y = self.alias(coalescedNodes, smt[1]), self.alias(coalescedNodes, smt[2])
+                    if x == y:
+                        pass
+                    else:
+                        print(f"\tmv\t{reg2use[coloredNode[x]]},\t{reg2use[coloredNode[y]]}")
+                elif smt[0] == lrEnum.lw:
+                    x, y = self.alias(coalescedNodes, smt[1]), self.alias(coalescedNodes, smt[3])
+                    if y == 'sp':
+                        print(f"\tlw\t{reg2use[coloredNode[x]]},\t{sp + smt[2]}(sp)")
+                    else:
+                        print(f"\tlw\t{reg2use[coloredNode[x]]},\t{smt[2]}({reg2use[coloredNode[y]]})")
+                elif smt[0] == lrEnum.label:
+                    print(f".{smt[1]}.{smt[2]}:")
+                elif smt[0] == lrEnum.binary:
+                    x, y, z = self.alias(coalescedNodes, smt[2]), self.alias(coalescedNodes, smt[3]), self.alias(coalescedNodes, smt[4])
+                    print(f"\t{smt[1]}\t{reg2use[coloredNode[x]]},\t{reg2use[coloredNode[y]]},\t{reg2use[coloredNode[z]]}")
+                elif smt[0] == lrEnum.li:
+                    x = self.alias(coalescedNodes, smt[1])
+                    print(f"\tli\t{reg2use[coloredNode[x]]}\t{smt[2]}")
+                elif smt[0] == lrEnum.ret:
+                    if self.needra:
+                        print(f"\tlw\tra,\t{sp - 4}(sp)")
+                    for reg in range(len(save)):
+                        print(f"\tlw\t{reg2use[save[reg]]},\t{sp - 4 * (self.needra + self.spillnum) - 4 * (reg + 1)}(sp)")
+                    if sp != 0:
+                        print(f"\taddi\tsp,\tsp,\t{sp}")
+                    print(f"\tret")
+                elif smt[0] == lrEnum.call:
+                    print(f"\tcall\t{smt[1]}")
+                elif smt[0] == lrEnum.sw:
+                    x, y = self.alias(coalescedNodes, smt[1]), self.alias(coalescedNodes, smt[3])
+                    if y == 'sp':
+                        print(f"\tsw\t{reg2use[coloredNode[x]]},\t{sp + smt[2]}(sp)")
+                    elif y == 'arg':
+                        print(f"\tsw\t{reg2use[coloredNode[x]]},\t{smt[2]}(sp)")
+                    else:
+                        print(f"\tsw\t{reg2use[coloredNode[x]]},\t{smt[2]}({reg2use[coloredNode[y]]})")
+                elif smt[0] == lrEnum.lui:
+                    x = self.alias(coalescedNodes, smt[1])
+                    print(f"\tlui\t{reg2use[coloredNode[x]]}\t%hi({smt[2]})")
+                elif smt[0] == lrEnum.icmp:
+                    x, y = self.alias(coalescedNodes, smt[2]), self.alias(coalescedNodes, smt[3])
+                    print(f"\t{smt[1]}\t{reg2use[coloredNode[x]]},\t{reg2use[coloredNode[y]]}")
+                elif smt[0] == lrEnum.j:
+                    print(f"\tj\t.{smt[1]}.{smt[2]}")
+                elif smt[0] == lrEnum.bnez:
+                    x = self.alias(coalescedNodes, smt[1])
+                    print(f"\tbnez\t{reg2use[coloredNode[x]]},\t.{smt[2]}.{smt[3]}")
+                elif smt[0] == lrEnum.binaryi:
+                    x, y = self.alias(coalescedNodes, smt[2]), self.alias(coalescedNodes, smt[3])
+                    if smt[1] == 'subi':
+                        print(f"\taddi\t{reg2use[coloredNode[x]]},\t{reg2use[coloredNode[y]]},\t{-smt[4]}")
+                    else:
+                        print(f"\t{smt[1]}\t{reg2use[coloredNode[x]]},\t{reg2use[coloredNode[y]]},\t{smt[4]}")
+            print('')
+
     def writeglobalvar(self, output, array):
         if array[0] == llvmEnum.GlobalVar:
             if type(array[3]).__name__ == 'str' and array[3][0] == '@':
@@ -1304,5 +1393,26 @@ class regalloc:
             else:
                 output.write(f'.string.{array[1]}:\n')
                 output.write(f'\t.asciz \"{array[3]}\"\n')
+        else:
+            pass
+
+    def printglobalvar(self, array):
+        if array[0] == llvmEnum.GlobalVar:
+            if type(array[3]).__name__ == 'str' and array[3][0] == '@':
+                print(f'.{array[1]}:')
+                print(f'\t.word {array[3][1:]}')
+            elif array[3] == 'null':
+                print(f'.{array[1]}:')
+                print(f'\t.word 0')
+            else:
+                print(f'.{array[1]}:')
+                print(f'\t.word {array[3]}')
+        elif array[0] == llvmEnum.GlobalString:
+            if array[2] == 1:
+                print(f'.string.{array[1]}:')
+                print(f'\t.zero 1')
+            else:
+                print(f'.string.{array[1]}:')
+                print(f'\t.asciz \"{array[3]}\"')
         else:
             pass
