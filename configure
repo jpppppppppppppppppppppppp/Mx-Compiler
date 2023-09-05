@@ -1,5 +1,5 @@
 #!/bin/bash
 
 mkdir bin/
-cp -r main.py py_parser builtin.s bin/
+cp -r main.py classEnum.py mem2reg.py regalloc.py py_parser builtin.s bin/
 mv bin/main.py bin/mxc

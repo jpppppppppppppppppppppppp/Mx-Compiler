@@ -3,7 +3,7 @@ from classEnum import *
 reg2use = ['a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 't0', 't1', 't2', 't3', 't4', 't5', 't6', 's0', 's1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9',
            's10', 's11']
 caller = ['a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 't0', 't1', 't2', 't3', 't4', 't5', 't6']
-
+callee = ['s0', 's1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11']
 binaryopt = {'mul': 'mul', 'sdiv': 'div', 'add': 'add', 'sub': 'sub', 'srem': 'rem', 'shl': 'sll', 'ashr': 'sra', 'and': 'and', 'or': 'or', 'xor': 'xor'}
 
 
@@ -11,6 +11,8 @@ class regalloc:
     def __init__(self):
         self.varnum = 0
         self.needra = False
+        self.funcarg = 0
+        self.spillnum = 0
 
     def mvrelated(self, name, movelist, activemMove, mvlib):
         if name not in movelist:
@@ -22,11 +24,15 @@ class regalloc:
 
     def translate(self, globalvars, allfunc, dt):
         ir = {}
+        output = open("test.s", 'w')
+        output.write('\t.text\n')
         for function in allfunc:
-
             ir[function] = self.make(function, allfunc[function], dt[function])
             while True:
                 mvlib, movelist, graph = self.staticAnalyze(ir[function])
+                origingraph = {}
+                for reg in graph:
+                    origingraph[reg] = graph[reg].copy()
                 selectStack = []
                 coalescedNodes = {}
                 coalescedMove = []
@@ -34,7 +40,6 @@ class regalloc:
                 frozenlist = []
                 activemMove = []
                 spillworklist, freezeworklist, simplifyworklist = self.makeworklist(mvlib, graph, movelist, activemMove)
-
                 while not (len(simplifyworklist) == 0 and len(freezeworklist) == 0 and len(spillworklist) == 0 and len(mvlib) == 0):
                     if len(simplifyworklist) != 0:
                         self.simplify(simplifyworklist, selectStack, mvlib, movelist, graph, activemMove, coalescedNodes, spillworklist,
@@ -45,8 +50,19 @@ class regalloc:
                     elif len(freezeworklist) != 0:
                         self.freeze(freezeworklist, simplifyworklist, movelist, mvlib, activemMove, coalescedNodes, frozenlist, graph)
                     elif len(spillworklist) != 0:
-                        self.selectspill()
+                        self.selectspill(spillworklist, simplifyworklist, movelist, activemMove, mvlib, coalescedNodes, frozenlist, graph, freezeworklist)
+                coloredNode, spilledNode = self.Assigncolors(selectStack, graph, coalescedNodes)
+                if len(spilledNode) != 0:
+                    self.ReWrite(spilledNode, ir[function])
+                    continue
                 break
+            for reg in reg2use:
+                coloredNode[reg] = reg2use.index(reg)
+            self.writefunction(output, function, ir[function], coloredNode, coalescedNodes)
+        output.write('\t.data\n')
+        for var in globalvars:
+            self.writeglobalvar(output, var)
+        output.flush()
 
     def staticAnalyze(self, function):
         pre = {}
@@ -378,7 +394,13 @@ class regalloc:
                             allblock[nowlabel].append([lrEnum.li, varname, lhsvalue])
                             allblock[nowlabel].append([lrEnum.binary, binaryopt[smt[2]], varname, varname, self.getreg(varbank, smt[5])])
                         elif rhscheck:
-                            allblock[nowlabel].append([lrEnum.binaryi, binaryopt[smt[2]] + 'i', varname, self.getreg(varbank, smt[4]), rhsvalue])
+                            if smt[2] in ['mul', 'sdiv', 'srem']:
+                                tempname = f"temp_{self.varnum}"
+                                self.varnum += 1
+                                allblock[nowlabel].append([lrEnum.li, tempname, smt[5]])
+                                allblock[nowlabel].append([lrEnum.binary, binaryopt[smt[2]], varname, self.getreg(varbank, smt[4]), tempname])
+                            else:
+                                allblock[nowlabel].append([lrEnum.binaryi, binaryopt[smt[2]] + 'i', varname, self.getreg(varbank, smt[4]), rhsvalue])
                         else:
                             allblock[nowlabel].append([lrEnum.binary, binaryopt[smt[2]], varname, self.getreg(varbank, smt[4]), self.getreg(varbank, smt[5])])
                 elif smt[0] == llvmEnum.Return:
@@ -401,6 +423,7 @@ class regalloc:
                 elif smt[0] == llvmEnum.ReturnVoid:
                     allblock[nowlabel].append([lrEnum.ret])
                 elif smt[0] == llvmEnum.FuncCall:
+                    self.funcarg = max(self.funcarg, len(smt[4]) - 8)
                     for i in range(len(smt[4])):
                         arg = smt[4][i]
                         argvalue, argcheck = self.constcheck(tempconst, arg[1])
@@ -424,26 +447,27 @@ class regalloc:
                                 varname = f"temp_{self.varnum}"
                                 self.varnum += 1
                                 allblock[nowlabel].append([lrEnum.li, varname, argvalue])
-                                allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'sp'])
+                                allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'arg'])
                             else:
                                 if arg[1] in varbank:
-                                    allblock[nowlabel].append([lrEnum.sw, varbank[arg[1]], (i - 8) * 4, 'sp'])
+                                    allblock[nowlabel].append([lrEnum.sw, varbank[arg[1]], (i - 8) * 4, 'arg'])
                                 else:
                                     if arg[1][0] != '@':
                                         varname = f"temp_{self.varnum}"
                                         self.varnum += 1
                                         varbank[arg[1]] = varname
-                                        allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'sp'])
+                                        allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'arg'])
                                     else:
                                         varname = f"temp_{self.varnum}"
                                         self.varnum += 1
                                         allblock[nowlabel].append([lrEnum.lui, varname, arg[1][1:]])
                                         allblock[nowlabel].append([lrEnum.binaryi, 'addi', varname, varname, f'%lo({arg[1][1:]})'])
-                                        allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'sp'])
+                                        allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'arg'])
                     varname = self.getreg(varbank, smt[1])
                     allblock[nowlabel].append([lrEnum.call, smt[3]])
                     allblock[nowlabel].append([lrEnum.mv, varname, 'a0'])
                 elif smt[0] == llvmEnum.FuncVoid:
+                    self.funcarg = max(self.funcarg, len(smt[2]) - 8)
                     for i in range(len(smt[2])):
                         arg = smt[2][i]
                         argvalue, argcheck = self.constcheck(tempconst, arg[1])
@@ -467,22 +491,22 @@ class regalloc:
                                 varname = f"temp_{self.varnum}"
                                 self.varnum += 1
                                 allblock[nowlabel].append([lrEnum.li, varname, argvalue])
-                                allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'sp'])
+                                allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'arg'])
                             else:
                                 if arg[1] in varbank:
-                                    allblock[nowlabel].append([lrEnum.sw, varbank[arg[1]], (i - 8) * 4, 'sp'])
+                                    allblock[nowlabel].append([lrEnum.sw, varbank[arg[1]], (i - 8) * 4, 'arg'])
                                 else:
                                     if arg[1][0] != '@':
                                         varname = f"temp_{self.varnum}"
                                         self.varnum += 1
                                         varbank[arg[1]] = varname
-                                        allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'sp'])
+                                        allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'arg'])
                                     else:
                                         varname = f"temp_{self.varnum}"
                                         self.varnum += 1
                                         allblock[nowlabel].append([lrEnum.lui, varname, arg[1][1:]])
                                         allblock[nowlabel].append([lrEnum.binaryi, 'addi', varname, varname, f'%lo({arg[1][1:]})'])
-                                        allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'sp'])
+                                        allblock[nowlabel].append([lrEnum.sw, varname, (i - 8) * 4, 'arg'])
                     allblock[nowlabel].append([lrEnum.call, smt[1]])
                 elif smt[0] == llvmEnum.Trunc:
                     if smt[1] in varbank:
@@ -605,7 +629,16 @@ class regalloc:
                         self.varnum += 1
                         allblock[nowlabel].append([lrEnum.li, varname, varvalue])
                     else:
-                        varname = self.getreg(varbank, smt[2])
+                        if smt[2] not in varbank:
+                            if smt[2][0] != '@':
+                                varname = self.getreg(varbank, smt[2])
+                            else:
+                                varname = f"temp_{self.varnum}"
+                                self.varnum += 1
+                                allblock[nowlabel].append([lrEnum.lui, varname, smt[2][1:]])
+                                allblock[nowlabel].append([lrEnum.binaryi, 'addi', varname, varname, f'%lo({smt[2][1:]})'])
+                        else:
+                            varname = self.getreg(varbank, smt[2])
                     if smt[3] not in varbank:
                         if smt[3][0] != "@":
                             tarReg = f"temp_{self.varnum}"
@@ -631,7 +664,10 @@ class regalloc:
                                 else:
                                     if arg[1] in varbank:
                                         varname = varbank[arg[1]]
-                                        phibank[arg[1]] = varname
+                                        tempname = f"temp_{self.varnum}"
+                                        self.varnum += 1
+                                        phibank[arg[1]] = tempname
+                                        allblock[nowlabel].append([lrEnum.mv, tempname, varname])
                                     else:
                                         if arg[1][0] != '@':
                                             tempvar = self.getreg(varbank, arg[1])
@@ -663,7 +699,10 @@ class regalloc:
                                         else:
                                             if arg[1] in varbank:
                                                 varname = varbank[arg[1]]
-                                                phibank[arg[1]] = varname
+                                                tempname = f"temp_{self.varnum}"
+                                                self.varnum += 1
+                                                phibank[arg[1]] = tempname
+                                                allblock[nowlabel].append([lrEnum.mv, tempname, varname])
                                             else:
                                                 if arg[1][0] != '@':
                                                     tempvar = self.getreg(varbank, arg[1])
@@ -810,6 +849,8 @@ class regalloc:
         if op == 'mul':
             return lhs * rhs
         if op == 'sdiv':
+            if rhs == 0:
+                return 0;
             return lhs / rhs
         if op == 'srem':
             return lhs % rhs
@@ -852,6 +893,8 @@ class regalloc:
 
     def simplify(self, simplifyworklist, selectStack, mvlib, movelist, graph, activemMove, coalescedNodes, spillworklist, freezeworklist):
         tosimplify = simplifyworklist.pop(0)
+        if tosimplify in reg2use:
+            return
         selectStack.append(tosimplify)
         if tosimplify in graph:
             for suc in graph[tosimplify]:
@@ -865,14 +908,14 @@ class regalloc:
                                     if m in activemMove:
                                         activemMove.remove(m)
                                         mvlib.append(m)
-                        spillworklist.remove(suc)
+                        if suc in spillworklist:
+                            spillworklist.remove(suc)
                         if self.mvrelated(suc, movelist, activemMove, mvlib):
                             if suc not in freezeworklist:
                                 freezeworklist.append(suc)
                         else:
                             if suc not in simplifyworklist:
                                 simplifyworklist.append(suc)
-            graph.pop(tosimplify)
 
     def coalesce(self, spillworklist, selectStack, mvlib, movelist, graph, activemMove, constrainedMove, coalescedMove, coalescedNodes,
                  freezeworklist, simplifyworklist):
@@ -953,7 +996,7 @@ class regalloc:
     def Combine(self, graph, u, v, freezeworklist, spillworklist, coalescedNodes, activemMove, mvlib, movelist, selectStack, simplifyworklist):
         if v in freezeworklist:
             freezeworklist.remove(v)
-        else:
+        if v in spillworklist:
             spillworklist.remove(v)
         coalescedNodes[v] = u
         for mv in movelist[v]:
@@ -964,6 +1007,8 @@ class regalloc:
                 mvlib.append(m)
         if u not in graph:
             graph[u] = set()
+        if v not in graph:
+            graph[v] = set()
         for t in graph[v]:
             graph[t].add(u)
             graph[t].discard(v)
@@ -984,7 +1029,7 @@ class regalloc:
                 else:
                     if t not in simplifyworklist:
                         simplifyworklist.append(t)
-        graph.pop(v)
+
         degree = len(graph[u])
         if degree >= len(reg2use):
             if u in freezeworklist:
@@ -1013,3 +1058,251 @@ class regalloc:
                     freezeworklist.remove(v)
                     if v not in simplifyworklist:
                         simplifyworklist.append(v)
+
+    def selectspill(self, spillworklist, simplifyworklist, movelist, activemMove, mvlib, coalescedNodes, frozenlist, graph, freezeworklist):
+        u = spillworklist.pop(0)
+        simplifyworklist.append(u)
+        for m in movelist[u]:
+            if m in activemMove or m in mvlib:
+                x, y = m[0], m[1]
+                if self.alias(coalescedNodes, y) == self.alias(coalescedNodes, u):
+                    v = self.alias(coalescedNodes, x)
+                else:
+                    v = self.alias(coalescedNodes, y)
+                activemMove.remove(m)
+                frozenlist.append(m)
+                if v in graph:
+                    degree = len(graph[v])
+                else:
+                    degree = 0
+                if self.mvrelated(v, movelist, activemMove, mvlib) and degree < len(reg2use):
+                    freezeworklist.remove(v)
+                    if v not in simplifyworklist:
+                        simplifyworklist.append(v)
+
+    def Assigncolors(self, selectStack, origingraph, coalescedNodes):
+        coloredNode = {}
+        spilledNode = []
+        while len(selectStack) > 0:
+            n = selectStack.pop()
+            color = set(range(len(reg2use)))
+            if n not in origingraph:
+                origingraph[n] = set()
+            for w in origingraph[n]:
+                alias = self.alias(coalescedNodes, w)
+                if alias in coloredNode:
+                    color.discard(coloredNode[alias])
+                elif alias in reg2use:
+                    color.discard(reg2use.index(alias))
+            if len(color) == 0:
+                spilledNode.append(n)
+            else:
+                color = list(color)
+                color.sort()
+                coloredNode[n] = color.pop(0)
+        for node in coalescedNodes:
+            alias = self.alias(coalescedNodes, node)
+            if alias in reg2use:
+                coloredNode[node] = reg2use.index(alias)
+            else:
+                coloredNode[node] = coloredNode[alias]
+        return coloredNode, spilledNode
+
+    def ReWrite(self, spilledNode, irfunction):
+        while len(spilledNode) > 0:
+            node = spilledNode.pop(0)
+            self.spillnum += 1
+            addr = -4 * (self.spillnum + self.needra)
+            for label in irfunction:
+                linenum = []
+                for i in range(len(label)):
+                    smt = label[i]
+                    if node in smt:
+                        linenum.append(i)
+                while len(linenum) > 0:
+                    line = linenum.pop()
+                    smt = label[line]
+                    if smt[0] == lrEnum.mv:
+                        if node == smt[1]:
+                            varname = f"temp_{self.varnum}"
+                            self.varnum += 1
+                            smt[1] = varname
+                            label.insert(line + 1, [lrEnum.sw, varname, addr, 'sp'])
+                        if node == smt[2]:
+                            varname = f"temp_{self.varnum}"
+                            self.varnum += 1
+                            smt[2] = varname
+                            label.insert(line, [lrEnum.lw, varname, addr, 'sp'])
+                    elif smt[0] == lrEnum.lw:
+                        if node == smt[1]:
+                            varname = f"temp_{self.varnum}"
+                            self.varnum += 1
+                            smt[1] = varname
+                            label.insert(line + 1, [lrEnum.sw, varname, addr, 'sp'])
+                        if node == smt[3]:
+                            varname = f"temp_{self.varnum}"
+                            self.varnum += 1
+                            smt[3] = varname
+                            label.insert(line, [lrEnum.lw, varname, addr, 'sp'])
+                    elif smt[0] == lrEnum.binary:
+                        if node == smt[2]:
+                            varname = f"temp_{self.varnum}"
+                            self.varnum += 1
+                            smt[2] = varname
+                            label.insert(line + 1, [lrEnum.sw, varname, addr, 'sp'])
+                        if node == smt[3]:
+                            varname = f"temp_{self.varnum}"
+                            self.varnum += 1
+                            smt[3] = varname
+                            label.insert(line, [lrEnum.lw, varname, addr, 'sp'])
+                        if node == smt[4]:
+                            varname = f"temp_{self.varnum}"
+                            self.varnum += 1
+                            smt[4] = varname
+                            label.insert(line, [lrEnum.lw, varname, addr, 'sp'])
+                    elif smt[0] == lrEnum.li:
+                        varname = f"temp_{self.varnum}"
+                        self.varnum += 1
+                        smt[1] = varname
+                        label.insert(line + 1, [lrEnum.sw, varname, addr, 'sp'])
+                    elif smt[0] == lrEnum.sw:
+                        if node == smt[1]:
+                            varname = f"temp_{self.varnum}"
+                            self.varnum += 1
+                            smt[1] = varname
+                            label.insert(line, [lrEnum.lw, varname, addr, 'sp'])
+                        if node == smt[3]:
+                            varname = f"temp_{self.varnum}"
+                            self.varnum += 1
+                            smt[3] = varname
+                            label.insert(line, [lrEnum.lw, varname, addr, 'sp'])
+                    elif smt[0] == lrEnum.lui:
+                        varname = f"temp_{self.varnum}"
+                        self.varnum += 1
+                        smt[1] = varname
+                        label.insert(line + 1, [lrEnum.sw, varname, addr, 'sp'])
+                    elif smt[0] == lrEnum.icmp:
+                        if node == smt[2]:
+                            varname = f"temp_{self.varnum}"
+                            self.varnum += 1
+                            smt[2] = varname
+                            label.insert(line + 1, [lrEnum.sw, varname, addr, 'sp'])
+                        if node == smt[3]:
+                            varname = f"temp_{self.varnum}"
+                            self.varnum += 1
+                            smt[3] = varname
+                            label.insert(line, [lrEnum.lw, varname, addr, 'sp'])
+                    elif smt[0] == lrEnum.bnez:
+                        varname = f"temp_{self.varnum}"
+                        self.varnum += 1
+                        smt[1] = varname
+                        label.insert(line, [lrEnum.lw, varname, addr, 'sp'])
+                    elif smt[0] == lrEnum.binaryi:
+                        if node == smt[2]:
+                            varname = f"temp_{self.varnum}"
+                            self.varnum += 1
+                            smt[2] = varname
+                            label.insert(line + 1, [lrEnum.sw, varname, addr, 'sp'])
+                        if node == smt[3]:
+                            varname = f"temp_{self.varnum}"
+                            self.varnum += 1
+                            smt[3] = varname
+                            label.insert(line, [lrEnum.lw, varname, addr, 'sp'])
+
+    def writefunction(self, output, funcname, function, coloredNode, coalescedNodes):
+        output.write(f"\t.globl {funcname}\n{funcname}:\t\t# @{funcname}\n")
+        sp = 0
+        save = []
+        sp = self.needra + self.spillnum + self.funcarg
+        temp = set()
+        for reg in coloredNode:
+            if reg not in reg2use and reg2use[coloredNode[reg]] in callee:
+                temp.add(coloredNode[reg])
+        sp += len(temp)
+        sp = 4 * ((sp + 3) & ~3)
+        save = list(temp)
+        if sp != 0:
+            output.write(f"\taddi\tsp,\tsp,\t{-sp}\n")
+        if self.needra:
+            output.write(f"\tsw\tra\t{sp - 4}(sp)\n")
+        for reg in range(len(save)):
+            output.write(f"\tsw\t{reg2use[save[reg]]}\t{sp - 4 * (self.needra + self.spillnum) - 4 * (reg + 1)}(sp)\n")
+        for label in function:
+            for smt in label:
+                if smt[0] == lrEnum.mv:
+                    x, y = self.alias(coalescedNodes, smt[1]), self.alias(coalescedNodes, smt[2])
+                    if x == y:
+                        pass
+                    else:
+                        output.write(f"\tmv\t{reg2use[coloredNode[x]]},\t{reg2use[coloredNode[y]]}\n")
+                elif smt[0] == lrEnum.lw:
+                    x, y = self.alias(coalescedNodes, smt[1]), self.alias(coalescedNodes, smt[3])
+                    if y == 'sp':
+                        output.write(f"\tlw\t{reg2use[coloredNode[x]]},\t{sp + smt[2]}(sp)\n")
+                    else:
+                        output.write(f"\tlw\t{reg2use[coloredNode[x]]},\t{smt[2]}({reg2use[coloredNode[y]]})\n")
+                elif smt[0] == lrEnum.label:
+                    output.write(f".{smt[1]}.{smt[2]}:\n")
+                elif smt[0] == lrEnum.binary:
+                    x, y, z = self.alias(coalescedNodes, smt[2]), self.alias(coalescedNodes, smt[3]), self.alias(coalescedNodes, smt[4])
+                    output.write(f"\t{smt[1]}\t{reg2use[coloredNode[x]]},\t{reg2use[coloredNode[y]]},\t{reg2use[coloredNode[z]]}\n")
+                elif smt[0] == lrEnum.li:
+                    x = self.alias(coalescedNodes, smt[1])
+                    output.write(f"\tli\t{reg2use[coloredNode[x]]}\t{smt[2]}\n")
+                elif smt[0] == lrEnum.ret:
+                    if self.needra:
+                        output.write(f"\tlw\tra,\t{sp - 4}(sp)\n")
+                    for reg in range(len(save)):
+                        output.write(f"\tlw\t{reg2use[save[reg]]},\t{sp - 4 * (self.needra + self.spillnum) - 4 * (reg + 1)}(sp)\n")
+                    if sp != 0:
+                        output.write(f"\taddi\tsp,\tsp,\t{sp}\n")
+                    output.write(f"\tret\n")
+                elif smt[0] == lrEnum.call:
+                    output.write(f"\tcall\t{smt[1]}\n")
+                elif smt[0] == lrEnum.sw:
+                    x, y = self.alias(coalescedNodes, smt[1]), self.alias(coalescedNodes, smt[3])
+                    if y == 'sp':
+                        output.write(f"\tsw\t{reg2use[coloredNode[x]]},\t{sp + smt[2]}(sp)\n")
+                    elif y == 'arg':
+                        output.write(f"\tsw\t{reg2use[coloredNode[x]]},\t{smt[2]}(sp)\n")
+                    else:
+                        output.write(f"\tsw\t{reg2use[coloredNode[x]]},\t{smt[2]}({reg2use[coloredNode[y]]})\n")
+                elif smt[0] == lrEnum.lui:
+                    x = self.alias(coalescedNodes, smt[1])
+                    output.write(f"\tlui\t{reg2use[coloredNode[x]]}\t%hi({smt[2]})\n")
+                elif smt[0] == lrEnum.icmp:
+                    x, y = self.alias(coalescedNodes, smt[2]), self.alias(coalescedNodes, smt[3])
+                    output.write(f"\t{smt[1]}\t{reg2use[coloredNode[x]]},\t{reg2use[coloredNode[y]]}\n")
+                elif smt[0] == lrEnum.j:
+                    output.write(f"\tj\t.{smt[1]}.{smt[2]}\n")
+                elif smt[0] == lrEnum.bnez:
+                    x = self.alias(coalescedNodes, smt[1])
+                    output.write(f"\tbnez\t{reg2use[coloredNode[x]]},\t.{smt[2]}.{smt[3]}\n")
+                elif smt[0] == lrEnum.binaryi:
+                    x, y = self.alias(coalescedNodes, smt[2]), self.alias(coalescedNodes, smt[3])
+                    if smt[1] == 'subi':
+                        output.write(f"\taddi\t{reg2use[coloredNode[x]]},\t{reg2use[coloredNode[y]]},\t{-smt[4]}\n")
+                    else:
+                        output.write(f"\t{smt[1]}\t{reg2use[coloredNode[x]]},\t{reg2use[coloredNode[y]]},\t{smt[4]}\n")
+            output.write('\n')
+
+    def writeglobalvar(self, output, array):
+        if array[0] == llvmEnum.GlobalVar:
+            if type(array[3]).__name__ == 'str' and array[3][0] == '@':
+                output.write(f'.{array[1]}:\n')
+                output.write(f'\t.word {array[3][1:]}\n')
+            elif array[3] == 'null':
+                output.write(f'.{array[1]}:\n')
+                output.write(f'\t.word 0\n')
+            else:
+                output.write(f'.{array[1]}:\n')
+                output.write(f'\t.word {array[3]}\n')
+        elif array[0] == llvmEnum.GlobalString:
+            if array[2] == 1:
+                output.write(f'.string.{array[1]}:\n')
+                output.write(f'\t.zero 1\n')
+            else:
+                output.write(f'.string.{array[1]}:\n')
+                output.write(f'\t.asciz \"{array[3]}\"\n')
+        else:
+            pass

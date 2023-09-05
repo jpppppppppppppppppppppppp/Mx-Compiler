@@ -44,4 +44,6 @@ class lrEnum(Enum):
     binaryi = 12
 
     def __eq__(self, other):
+        if type(other).__name__ != 'lrEnum':
+            return False
         return self.value == other.value
