@@ -8,7 +8,7 @@ clang-15 -m32 builtin.ll output.ll -o test
 $?
 ```
 
-| testcase | simulate time(without any opt) | simulate time(mem2reg & regalloc & easy kill deadcode) |
+| testcase | simulate time(without any opt) | simulate time(mem2reg & regalloc & radical kill deadcode) |
 | :--: | :--: | :--: |
 |e1.mx| 103911 | 46477 |
 |e10.mx| 3511 | 1335 |
