@@ -399,7 +399,20 @@ class regalloc:
                     lhsvalue, lhscheck = self.constcheck(tempconst, smt[4])
                     rhsvalue, rhscheck = self.constcheck(tempconst, smt[5])
                     if lhscheck and rhscheck:
-                        tempconst[smt[1]] = self.getvalue(smt[2], lhsvalue, rhsvalue)
+                        value = self.getvalue(smt[2], lhsvalue, rhsvalue)
+                        if abs(value) < (1 << 31):
+                            tempconst[smt[1]] = value
+                        else:
+                            varname = self.getreg(varbank, smt[1])
+                            allblock[nowlabel].append([lrEnum.li, varname, lhsvalue])
+                            if smt[2] in ['mul', 'sdiv', 'srem']:
+                                tempname = f"temp_{self.varnum}"
+                                self.varnum += 1
+                                allblock[nowlabel].append([lrEnum.li, tempname, rhsvalue])
+                                allblock[nowlabel].append([lrEnum.binary, binaryopt[smt[2]], varname, varname, tempname])
+                            else:
+                                allblock[nowlabel].append([lrEnum.binaryi, binaryopt[smt[2]] + 'i', varname, varname, rhsvalue])
+
                     else:
                         varname = self.getreg(varbank, smt[1])
                         if lhscheck:
@@ -409,7 +422,7 @@ class regalloc:
                             if smt[2] in ['mul', 'sdiv', 'srem']:
                                 tempname = f"temp_{self.varnum}"
                                 self.varnum += 1
-                                allblock[nowlabel].append([lrEnum.li, tempname, smt[5]])
+                                allblock[nowlabel].append([lrEnum.li, tempname, rhsvalue])
                                 allblock[nowlabel].append([lrEnum.binary, binaryopt[smt[2]], varname, self.getreg(varbank, smt[4]), tempname])
                             else:
                                 allblock[nowlabel].append([lrEnum.binaryi, binaryopt[smt[2]] + 'i', varname, self.getreg(varbank, smt[4]), rhsvalue])

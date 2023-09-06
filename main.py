@@ -839,7 +839,9 @@ class ASTBuilder:
                 if res.op in ['+', '-', '*', '/', '%', '<<', '>>', '&', '|', '^']:
                     if res.op == '/' and res.rhs.value == 0:
                         return ASTConstExprContextNode(t=typeclass(t=typeEnum.INT), v=0)
-                    return ASTConstExprContextNode(t=typeclass(t=typeEnum.INT), v=int(eval(str(res.lhs.value) + res.op + str(res.rhs.value))))
+                    value = int(eval(str(res.lhs.value) + res.op + str(res.rhs.value)))
+                    if abs(value) < (1 << 31):
+                        return ASTConstExprContextNode(t=typeclass(t=typeEnum.INT), v=int(eval(str(res.lhs.value) + res.op + str(res.rhs.value))))
                 elif res.op in ['<', '>', '<=', '>=', '==', '!=']:
                     return ASTConstExprContextNode(t=typeclass(t=typeEnum.BOOL), v=int(eval(str(res.lhs.value) + res.op + str(res.rhs.value))))
             elif res.lhs.type.type == typeEnum.BOOL and res.rhs.type.type == typeEnum.BOOL:
