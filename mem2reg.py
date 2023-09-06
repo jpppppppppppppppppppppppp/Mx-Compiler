@@ -15,6 +15,7 @@ class mem2reg:
         for func in allfunc:
             ret[func] = self.opt(allfunc[func])
             self.deadcode(allfunc[func])
+            self.radicaldeadcode(allfunc, func)
         return ret
 
     def opt(self, function):
@@ -190,7 +191,6 @@ class mem2reg:
                 phi[label] = {}
             if not update:
                 break
-
         dt = {}
         parent = {}
         queue = ['entry']
@@ -487,6 +487,10 @@ class mem2reg:
                         self.used[smt[5]] = []
                     self.used[smt[5]].append([nowlabel, i])
                     allvar.add(smt[5])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
                 elif smt[0] == llvmEnum.FuncCall:
                     for arg in smt[4]:
                         if arg[1] not in self.used:
@@ -549,3 +553,385 @@ class mem2reg:
                                 smt[0] = llvmEnum.Pass
                                 self.used[smt[3]].remove(s)
                                 allvar.add(smt[3])
+
+    def radicaldeadcode(self, allfunc, func):
+        nowfunc = []
+        for label in allfunc[func][2]:
+            nowfunc.append([])
+            for smt in label:
+                if smt[0] != llvmEnum.Pass:
+                    nowfunc[-1].append(smt)
+        allfunc[func][2] = nowfunc
+        self.next.clear()
+        self.pre.clear()
+        self.blocks.clear()
+        self.used.clear()
+        self.defd.clear()
+        allvar = set()
+        nowlabel = ''
+        liveline = {}
+        livevar = set()
+        livelabel = set()
+        for block in nowfunc:
+            for i in range(len(block)):
+                smt = block[i]
+                if smt[0] == llvmEnum.Label:
+                    nowlabel = smt[1]
+                    liveline[nowlabel] = set()
+                    if nowlabel not in self.pre:
+                        self.pre[nowlabel] = []
+                    if nowlabel not in self.next:
+                        self.next[nowlabel] = []
+                    self.blocks[nowlabel] = block
+                elif smt[0] == llvmEnum.Jump:
+                    self.pre[nowlabel].append(smt[1])
+                    if smt[1] not in self.next:
+                        self.next[smt[1]] = []
+                    self.next[smt[1]].append(nowlabel)
+                elif smt[0] == llvmEnum.Br:
+                    if smt[1] not in self.used:
+                        self.used[smt[1]] = []
+                    self.used[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                    self.pre[nowlabel].append(smt[2])
+                    if smt[2] not in self.next:
+                        self.next[smt[2]] = []
+                    self.next[smt[2]].append(nowlabel)
+                    self.pre[nowlabel].append(smt[3])
+                    if smt[3] not in self.next:
+                        self.next[smt[3]] = []
+                    self.next[smt[3]].append(nowlabel)
+                elif smt[0] == llvmEnum.Return:
+                    liveline[nowlabel].add(i)
+                    livelabel.add(nowlabel)
+                    livevar.add(smt[2])
+                    if smt[2] not in self.used:
+                        self.used[smt[2]] = []
+                    self.used[smt[2]].append([nowlabel, i])
+                    allvar.add(smt[2])
+                elif smt[0] == llvmEnum.ReturnVoid:
+                    liveline[nowlabel].add(i)
+                    livelabel.add(nowlabel)
+                elif smt[0] == llvmEnum.Alloca:
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.Load:
+                    if smt[3] not in self.used:
+                        self.used[smt[3]] = []
+                    self.used[smt[3]].append([nowlabel, i])
+                    allvar.add(smt[3])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.Getelementptr1:
+                    if smt[3] not in self.used:
+                        self.used[smt[3]] = []
+                    self.used[smt[3]].append([nowlabel, i])
+                    allvar.add(smt[3])
+                    if smt[4] not in self.used:
+                        self.used[smt[4]] = []
+                    self.used[smt[4]].append([nowlabel, i])
+                    allvar.add(smt[4])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.Getelementptr2:
+                    if smt[3] not in self.used:
+                        self.used[smt[3]] = []
+                    self.used[smt[3]].append([nowlabel, i])
+                    allvar.add(smt[3])
+                    if smt[4] not in self.used:
+                        self.used[smt[4]] = []
+                    self.used[smt[4]].append([nowlabel, i])
+                    allvar.add(smt[4])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.Trunc:
+                    if smt[2] not in self.used:
+                        self.used[smt[2]] = []
+                    self.used[smt[2]].append([nowlabel, i])
+                    allvar.add(smt[2])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.Zext:
+                    if smt[2] not in self.used:
+                        self.used[smt[2]] = []
+                    self.used[smt[2]].append([nowlabel, i])
+                    allvar.add(smt[2])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.Phi:
+                    for use in smt[3]:
+                        if use[0] not in self.used:
+                            self.used[use[0]] = []
+                        self.used[use[0]].append([nowlabel, i])
+                        allvar.add(use[0])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.Icmp:
+                    if smt[4] not in self.used:
+                        self.used[smt[4]] = []
+                    self.used[smt[4]].append([nowlabel, i])
+                    allvar.add(smt[4])
+                    if smt[5] not in self.used:
+                        self.used[smt[5]] = []
+                    self.used[smt[5]].append([nowlabel, i])
+                    allvar.add(smt[5])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.Store:
+                    liveline[nowlabel].add(i)
+                    livelabel.add(nowlabel)
+                    livevar.add(smt[2])
+                    livevar.add(smt[3])
+                    if smt[2] not in self.used:
+                        self.used[smt[2]] = []
+                    self.used[smt[2]].append([nowlabel, i])
+                    allvar.add(smt[2])
+                    if smt[3] not in self.used:
+                        self.used[smt[3]] = []
+                    self.used[smt[3]].append([nowlabel, i])
+                    allvar.add(smt[3])
+                elif smt[0] == llvmEnum.Binary:
+                    if smt[4] not in self.used:
+                        self.used[smt[4]] = []
+                    self.used[smt[4]].append([nowlabel, i])
+                    allvar.add(smt[4])
+                    if smt[5] not in self.used:
+                        self.used[smt[5]] = []
+                    self.used[smt[5]].append([nowlabel, i])
+                    allvar.add(smt[5])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.FuncCall:
+                    liveline[nowlabel].add(i)
+                    livelabel.add(nowlabel)
+                    for arg in smt[4]:
+                        livevar.add(arg[1])
+                        if arg[1] not in self.used:
+                            self.used[arg[1]] = []
+                        self.used[arg[1]].append([nowlabel, i])
+                        allvar.add(arg[1])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.FuncVoid:
+                    liveline[nowlabel].add(i)
+                    livelabel.add(nowlabel)
+                    for arg in smt[2]:
+                        livevar.add(arg[1])
+                        if arg[1] not in self.used:
+                            self.used[arg[1]] = []
+                        self.used[arg[1]].append([nowlabel, i])
+                        allvar.add(arg[1])
+        d = {}
+        for label in self.blocks:
+            d[label] = set()
+            for labels in self.blocks:
+                d[label].add(labels)
+        while True:
+            update = False
+            for label in d:
+                newd = set()
+                if len(self.pre[label]) != 0:
+                    for temp in self.blocks:
+                        newd.add(temp)
+                for pre in self.pre[label]:
+                    newd = newd.intersection(d[pre])
+                newd.add(label)
+                if newd == d[label]:
+                    continue
+                update = True
+                d[label] = newd
+            if not update:
+                break
+        df = {}
+        for label in self.blocks:
+            if label not in df:
+                df[label] = set()
+            for n in d[label]:
+                for suc in self.next[label]:
+                    if n not in d[suc] or n == suc:
+                        if n not in df:
+                            df[n] = set()
+                        df[n].add(suc)
+        dt = {}
+        parent = {}
+        if '_init.' in func:
+            queue = ['entry']
+        else:
+            queue = ['return']
+        while len(queue) != 0:
+            front = queue.pop(0)
+            dt[front] = []
+            d.pop(front)
+            for item in d:
+                d[item].discard(front)
+                if len(d[item]) == 1 and item not in queue:
+                    queue.append(item)
+                    dt[front].append(item)
+                    parent[item] = front
+        while True:
+            updated = False
+            for block in nowfunc:
+                for i in range(len(block)):
+                    smt = block[i]
+                    if smt[0] == llvmEnum.Label:
+                        nowlabel = smt[1]
+                    elif smt[0] == llvmEnum.Jump:
+                        if i not in liveline[nowlabel]:
+                            if smt[1] in livelabel:
+                                updated = True
+                                liveline[nowlabel].add(i)
+                                livelabel.add(nowlabel)
+                    elif smt[0] == llvmEnum.Br:
+                        if i not in liveline[nowlabel]:
+                            Flag = False
+                            for alllive in livelabel:
+                                if nowlabel in df[alllive]:
+                                    Flag = True
+                                    break
+                            if Flag:
+                                updated = True
+                                livelabel.add(nowlabel)
+                                liveline[nowlabel].add(i)
+                                livevar.add(smt[1])
+                    elif smt[0] == llvmEnum.Return:
+                        pass
+                    elif smt[0] == llvmEnum.ReturnVoid:
+                        pass
+                    elif smt[0] == llvmEnum.Alloca:
+                        if i not in liveline[nowlabel]:
+                            if smt[1] in livevar:
+                                livelabel.add(nowlabel)
+                                liveline[nowlabel].add(i)
+                                updated = True
+                    elif smt[0] == llvmEnum.Load:
+                        if i not in liveline[nowlabel]:
+                            if smt[1] in livevar:
+                                livelabel.add(nowlabel)
+                                liveline[nowlabel].add(i)
+                                livevar.add(smt[3])
+                                updated = True
+                    elif smt[0] == llvmEnum.Getelementptr1:
+                        if i not in liveline[nowlabel]:
+                            if smt[1] in livevar:
+                                livelabel.add(nowlabel)
+                                liveline[nowlabel].add(i)
+                                livevar.add(smt[3])
+                                livevar.add(smt[4])
+                                updated = True
+                    elif smt[0] == llvmEnum.Getelementptr2:
+                        if i not in liveline[nowlabel]:
+                            if smt[1] in livevar:
+                                livelabel.add(nowlabel)
+                                liveline[nowlabel].add(i)
+                                livevar.add(smt[3])
+                                livevar.add(smt[4])
+                                updated = True
+                    elif smt[0] == llvmEnum.Trunc:
+                        if i not in liveline[nowlabel]:
+                            if smt[1] in livevar:
+                                livelabel.add(nowlabel)
+                                liveline[nowlabel].add(i)
+                                livevar.add(smt[2])
+                                updated = True
+                    elif smt[0] == llvmEnum.Zext:
+                        if i not in liveline[nowlabel]:
+                            if smt[1] in livevar:
+                                livelabel.add(nowlabel)
+                                liveline[nowlabel].add(i)
+                                livevar.add(smt[2])
+                                updated = True
+                    elif smt[0] == llvmEnum.Phi:
+                        if i not in liveline[nowlabel]:
+                            if smt[1] in livevar:
+                                livelabel.add(nowlabel)
+                                liveline[nowlabel].add(i)
+                                for use in smt[3]:
+                                    livevar.add(use[0])
+                                    livelabel.add(use[1])
+                                updated = True
+                    elif smt[0] == llvmEnum.Icmp:
+                        if i not in liveline[nowlabel]:
+                            if smt[1] in livevar:
+                                livelabel.add(nowlabel)
+                                liveline[nowlabel].add(i)
+                                livevar.add(smt[4])
+                                livevar.add(smt[5])
+                                updated = True
+                    elif smt[0] == llvmEnum.Store:
+                        pass
+                    elif smt[0] == llvmEnum.Binary:
+                        if i not in liveline[nowlabel]:
+                            if smt[1] in livevar:
+                                livelabel.add(nowlabel)
+                                liveline[nowlabel].add(i)
+                                livevar.add(smt[4])
+                                livevar.add(smt[5])
+                                updated = True
+                    elif smt[0] == llvmEnum.FuncCall:
+                        pass
+                    elif smt[0] == llvmEnum.FuncVoid:
+                        pass
+            if not updated:
+                break
+        nowlabel = ''
+        for block in nowfunc:
+            for i in range(len(block)):
+                smt = block[i]
+                if smt[0] == llvmEnum.Label:
+                    nowlabel = smt[1]
+                    if nowlabel not in livelabel:
+                        smt[0] = llvmEnum.Pass
+                elif smt[0] == llvmEnum.Jump:
+                    if nowlabel not in livelabel:
+                        smt[0] = llvmEnum.Pass
+                    else:
+                        smt[1] = self.findJump(dt, livelabel, smt[1])
+                elif smt[0] == llvmEnum.Br:
+                    if nowlabel not in livelabel:
+                        smt[0] = llvmEnum.Pass
+                    else:
+                        if i in liveline[nowlabel]:
+                            smt[2] = self.findJump(dt, livelabel, smt[2])
+                            smt[3] = self.findJump(dt, livelabel, smt[3])
+                        else:
+                            smt[0] = llvmEnum.Jump
+                            smt[1] = self.findJump(dt, livelabel, smt[2])
+                elif smt[0] == llvmEnum.Phi:
+                    if nowlabel not in livelabel:
+                        smt[0] = llvmEnum.Pass
+                    else:
+                        if i in liveline[nowlabel]:
+                            for node in smt[3]:
+                                node[1] = self.findJump(dt, livelabel, node[1])
+                        else:
+                            smt[0] = llvmEnum.Pass
+                else:
+                    if i not in liveline[nowlabel]:
+                        smt[0] = llvmEnum.Pass
+
+    def findJump(self, dt, livelabel, where):
+        if where in livelabel:
+            return where
+        for node in dt:
+            if where in dt[node]:
+                return self.findJump(dt, livelabel, node)

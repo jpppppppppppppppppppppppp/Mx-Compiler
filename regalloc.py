@@ -382,6 +382,8 @@ class regalloc:
         while len(queue) > 0:
             name = queue.pop(0)
             if name not in alllabel:
+                for suc in dt[name]:
+                    queue.append(suc)
                 continue
             label = alllabel[name]
             nowlabel = ""
