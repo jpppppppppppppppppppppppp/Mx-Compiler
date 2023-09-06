@@ -3886,7 +3886,7 @@ if __name__ == "__main__":
     #             flag = builder.check(ast)
     #             builder.llvm(ast)
     #             output.flush()
-    #             builder.riscv()
+    #             builder.riscv(False)
     #             commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && ./ravel_test --input-file=test.in --output-file=test.out test.s builtin.s"'
     #             process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
     #             stdout, _ = process.communicate()
@@ -3930,7 +3930,7 @@ if __name__ == "__main__":
     #                 flag = builder.check(ast)
     #                 builder.llvm(ast)
     #                 output.flush()
-    #                 builder.riscv()
+    #                 builder.riscv(False)
     #                 commands = 'bash -c "cd /mnt/c/Users/14908/Desktop/PPCA/Compiler && ./ravel_test --input-file=test.in --output-file=test.out test.s builtin.s"'
     #                 process = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
     #                 stdout, _ = process.communicate()

@@ -14,6 +14,7 @@ class mem2reg:
         ret = {}
         for func in allfunc:
             ret[func] = self.opt(allfunc[func])
+            self.deadcode(allfunc[func])
         return ret
 
     def opt(self, function):
@@ -265,6 +266,7 @@ class mem2reg:
                     function[2].pop(i)
                     break
         return dt
+
     def rename(self, task, varbank, phi, df, parent, dt, typelist):
         label = task.pop(0)
         if label not in varbank:
@@ -360,3 +362,190 @@ class mem2reg:
             if varname[0] == '@':
                 return varname
             return None
+
+    def deadcode(self, function):
+        self.blocks.clear()
+        self.used.clear()
+        self.defd.clear()
+        allvar = set()
+        for block in function[2]:
+            for i in range(len(block)):
+                smt = block[i]
+                if smt[0] == llvmEnum.Label:
+                    nowlabel = smt[1]
+                    self.blocks[nowlabel] = block
+                elif smt[0] == llvmEnum.Jump:
+                    pass
+                elif smt[0] == llvmEnum.Br:
+                    if smt[1] not in self.used:
+                        self.used[smt[1]] = []
+                    self.used[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.Return:
+                    if smt[2] not in self.used:
+                        self.used[smt[2]] = []
+                    self.used[smt[2]].append([nowlabel, i])
+                    allvar.add(smt[2])
+                elif smt[0] == llvmEnum.ReturnVoid:
+                    pass
+                elif smt[0] == llvmEnum.Alloca:
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.Load:
+                    if smt[3] not in self.used:
+                        self.used[smt[3]] = []
+                    self.used[smt[3]].append([nowlabel, i])
+                    allvar.add(smt[3])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.Getelementptr1:
+                    if smt[3] not in self.used:
+                        self.used[smt[3]] = []
+                    self.used[smt[3]].append([nowlabel, i])
+                    allvar.add(smt[3])
+                    if smt[4] not in self.used:
+                        self.used[smt[4]] = []
+                    self.used[smt[4]].append([nowlabel, i])
+                    allvar.add(smt[4])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.Getelementptr2:
+                    if smt[3] not in self.used:
+                        self.used[smt[3]] = []
+                    self.used[smt[3]].append([nowlabel, i])
+                    allvar.add(smt[3])
+                    if smt[4] not in self.used:
+                        self.used[smt[4]] = []
+                    self.used[smt[4]].append([nowlabel, i])
+                    allvar.add(smt[4])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.Trunc:
+                    if smt[2] not in self.used:
+                        self.used[smt[2]] = []
+                    self.used[smt[2]].append([nowlabel, i])
+                    allvar.add(smt[2])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.Zext:
+                    if smt[2] not in self.used:
+                        self.used[smt[2]] = []
+                    self.used[smt[2]].append([nowlabel, i])
+                    allvar.add(smt[2])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.Phi:
+                    for use in smt[3]:
+                        if use[0] not in self.used:
+                            self.used[use[0]] = []
+                        self.used[use[0]].append([nowlabel, i])
+                        allvar.add(use[0])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.Icmp:
+                    if smt[4] not in self.used:
+                        self.used[smt[4]] = []
+                    self.used[smt[4]].append([nowlabel, i])
+                    allvar.add(smt[4])
+                    if smt[5] not in self.used:
+                        self.used[smt[5]] = []
+                    self.used[smt[5]].append([nowlabel, i])
+                    allvar.add(smt[5])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.Store:
+                    if smt[2] not in self.used:
+                        self.used[smt[2]] = []
+                    self.used[smt[2]].append([nowlabel, i])
+                    allvar.add(smt[2])
+                    if smt[3] not in self.used:
+                        self.used[smt[3]] = []
+                    self.used[smt[3]].append([nowlabel, i])
+                    allvar.add(smt[3])
+                elif smt[0] == llvmEnum.Binary:
+                    if smt[4] not in self.used:
+                        self.used[smt[4]] = []
+                    self.used[smt[4]].append([nowlabel, i])
+                    allvar.add(smt[4])
+                    if smt[5] not in self.used:
+                        self.used[smt[5]] = []
+                    self.used[smt[5]].append([nowlabel, i])
+                    allvar.add(smt[5])
+                elif smt[0] == llvmEnum.FuncCall:
+                    for arg in smt[4]:
+                        if arg[1] not in self.used:
+                            self.used[arg[1]] = []
+                        self.used[arg[1]].append([nowlabel, i])
+                        allvar.add(arg[1])
+                    if smt[1] not in self.defd:
+                        self.defd[smt[1]] = []
+                    self.defd[smt[1]].append([nowlabel, i])
+                    allvar.add(smt[1])
+                elif smt[0] == llvmEnum.FuncVoid:
+                    for arg in smt[2]:
+                        if arg[1] not in self.used:
+                            self.used[arg[1]] = []
+                        self.used[arg[1]].append([nowlabel, i])
+                        allvar.add(arg[1])
+        while len(allvar) > 0:
+            var = allvar.pop()
+            if var[0] in ['@', '%']:
+                if var not in self.used or len(self.used[var]) == 0:
+                    if var in self.defd:
+                        for s in self.defd[var]:
+                            smt = self.blocks[s[0]][s[1]]
+                            if smt[0] == llvmEnum.FuncCall:
+                                pass
+                            elif smt[0] == llvmEnum.Icmp:
+                                smt[0] = llvmEnum.Pass
+                                self.used[smt[4]].remove(s)
+                                self.used[smt[5]].remove(s)
+                                allvar.add(smt[4])
+                                allvar.add(smt[5])
+                            elif smt[0] == llvmEnum.Phi:
+                                smt[0] = llvmEnum.Pass
+                                for use in smt[3]:
+                                    self.used[use[0]].remove(s)
+                                    allvar.add(use[0])
+                            elif smt[0] == llvmEnum.Zext:
+                                smt[0] = llvmEnum.Pass
+                                self.used[smt[2]].remove(s)
+                                allvar.add(smt[2])
+                            elif smt[0] == llvmEnum.Trunc:
+                                smt[0] = llvmEnum.Pass
+                                self.used[smt[2]].remove(s)
+                                allvar.add(smt[2])
+                            elif smt[0] == llvmEnum.Getelementptr1:
+                                smt[0] = llvmEnum.Pass
+                                self.used[smt[3]].remove(s)
+                                allvar.add(smt[3])
+                                self.used[smt[4]].remove(s)
+                                allvar.add(smt[4])
+                            elif smt[0] == llvmEnum.Getelementptr2:
+                                smt[0] = llvmEnum.Pass
+                                self.used[smt[3]].remove(s)
+                                allvar.add(smt[3])
+                                self.used[smt[4]].remove(s)
+                                allvar.add(smt[4])
+                            elif smt[0] == llvmEnum.Alloca:
+                                smt[0] = llvmEnum.Pass
+                            elif smt[0] == llvmEnum.Load:
+                                smt[0] = llvmEnum.Pass
+                                self.used[smt[3]].remove(s)
+                                allvar.add(smt[3])

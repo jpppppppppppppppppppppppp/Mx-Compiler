@@ -1087,6 +1087,8 @@ class regalloc:
     def selectspill(self, spillworklist, simplifyworklist, movelist, activemMove, mvlib, coalescedNodes, frozenlist, graph, freezeworklist):
         u = spillworklist.pop(0)
         simplifyworklist.append(u)
+        if u not in movelist:
+            movelist[u] = []
         for m in movelist[u]:
             if m in activemMove or m in mvlib:
                 x, y = m[0], m[1]
@@ -1129,7 +1131,7 @@ class regalloc:
             alias = self.alias(coalescedNodes, node)
             if alias in reg2use:
                 coloredNode[node] = reg2use.index(alias)
-            else:
+            elif alias in coloredNode:
                 coloredNode[node] = coloredNode[alias]
         return coloredNode, spilledNode
 
