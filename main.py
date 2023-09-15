@@ -3686,9 +3686,6 @@ declare ptr @malloc(i32)
     #         self.translator.translatefunction(func, self.llvmfunc[func])
     #     self.translator.write()
     def riscv(self, flag):
-        maxarg = 0
-        for func in self.llvmfunc:
-            maxarg = max(maxarg, len(self.llvmfunc[func][1]) - 8)
         self.translator.translate(self.globalvars, self.llvmfunc, self.dt, flag)
 
     def Mem2Reg(self):
@@ -3776,7 +3773,7 @@ if __name__ == "__main__":
             flag = builder.check(ast)
             builder.llvm(ast)
             output.flush()
-            # builder.riscv(True)
+            builder.riscv(True)
         except Exception as e:
             flag = False
         if not flag:

@@ -1088,14 +1088,16 @@ class regalloc:
                     v = self.alias(coalescedNodes, x)
                 else:
                     v = self.alias(coalescedNodes, y)
-                activemMove.remove(m)
+                if m in activemMove:
+                    activemMove.remove(m)
                 frozenlist.append(m)
                 if v in graph:
                     degree = len(graph[v])
                 else:
                     degree = 0
                 if self.mvrelated(v, movelist, activemMove, mvlib) and degree < len(reg2use):
-                    freezeworklist.remove(v)
+                    if v in freezeworklist:
+                        freezeworklist.remove(v)
                     if v not in simplifyworklist:
                         simplifyworklist.append(v)
 
@@ -1118,14 +1120,16 @@ class regalloc:
                     v = self.alias(coalescedNodes, x)
                 else:
                     v = self.alias(coalescedNodes, y)
-                activemMove.remove(m)
+                if m in activemMove:
+                    activemMove.remove(m)
                 frozenlist.append(m)
                 if v in graph:
                     degree = len(graph[v])
                 else:
                     degree = 0
                 if self.mvrelated(v, movelist, activemMove, mvlib) and degree < len(reg2use):
-                    freezeworklist.remove(v)
+                    if v in freezeworklist:
+                        freezeworklist.remove(v)
                     if v not in simplifyworklist:
                         simplifyworklist.append(v)
 
