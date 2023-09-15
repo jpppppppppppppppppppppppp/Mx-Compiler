@@ -3771,9 +3771,9 @@ if __name__ == "__main__":
             builder = ASTBuilder()
             ast = builder.build(cst)
             flag = builder.check(ast)
-            builder.llvm(ast)
-            output.flush()
-            builder.riscv(True)
+            # builder.llvm(ast)
+            # output.flush()
+            # builder.riscv(True)
         except Exception as e:
             flag = False
         if not flag:
