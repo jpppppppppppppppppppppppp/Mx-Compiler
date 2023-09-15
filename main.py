@@ -3551,7 +3551,7 @@ class ASTBuilder:
             self.generateFuncCall(where, typetodo, 'malloc', [str(self.sizebank[typetodo.name])], target)
             if self.ClassBank[typetodo.name].ConstructFunc != ASTEmptyNode():
                 self.generateFuncCall(where, typeclass(t=typeEnum.VOID), f"CLASS.{typetodo.name}.{typetodo.name}", [target], None)
-        elif type(vars).__name__ == 'int':
+        elif type(vars).__name__ == 'ASTAssignExprNode':
             pass
         else:
             raise Exception("TODO")
