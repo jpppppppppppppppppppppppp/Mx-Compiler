@@ -220,37 +220,37 @@ class mem2reg:
         task = ['entry']
         while len(task) > 0:
             self.rename(task, varbank, phi, df, parent, dt, typelist)
-        self.next.clear()
-        self.pre.clear()
-        for block in function[2]:
-            nowlabel = block[0][1]
-            if nowlabel not in self.next:
-                self.next[nowlabel] = []
-            if nowlabel not in self.pre:
-                self.pre[nowlabel] = []
-            for i in range(len(block)):
-                smt = block[i]
-                if smt[0] == llvmEnum.Jump:
-                    self.next[nowlabel].append(smt[1])
-                    if smt[1] not in self.pre:
-                        self.pre[smt[1]] = []
-                    self.pre[smt[1]].append(nowlabel)
-                elif smt[0] == llvmEnum.Br:
-                    self.next[nowlabel].append(smt[2])
-                    if smt[2] not in self.pre:
-                        self.pre[smt[2]] = []
-                    self.pre[smt[2]].append(nowlabel)
-                    self.next[nowlabel].append(smt[3])
-                    if smt[3] not in self.pre:
-                        self.pre[smt[3]] = []
-                    self.pre[smt[3]].append(nowlabel)
-                    if smt[1] not in self.used:
-                        self.used[smt[1]] = []
-                    self.used[smt[1]].append([nowlabel, i])
-        todel = []
-        for block in self.blocks:
-            if block not in self.pre or len(self.pre[block]) == 0 and block != 'entry':
-                todel.append(block)
+        # self.next.clear()
+        # self.pre.clear()
+        # for block in function[2]:
+        #     nowlabel = block[0][1]
+        #     if nowlabel not in self.next:
+        #         self.next[nowlabel] = []
+        #     if nowlabel not in self.pre:
+        #         self.pre[nowlabel] = []
+        #     for i in range(len(block)):
+        #         smt = block[i]
+        #         if smt[0] == llvmEnum.Jump:
+        #             self.next[nowlabel].append(smt[1])
+        #             if smt[1] not in self.pre:
+        #                 self.pre[smt[1]] = []
+        #             self.pre[smt[1]].append(nowlabel)
+        #         elif smt[0] == llvmEnum.Br:
+        #             self.next[nowlabel].append(smt[2])
+        #             if smt[2] not in self.pre:
+        #                 self.pre[smt[2]] = []
+        #             self.pre[smt[2]].append(nowlabel)
+        #             self.next[nowlabel].append(smt[3])
+        #             if smt[3] not in self.pre:
+        #                 self.pre[smt[3]] = []
+        #             self.pre[smt[3]].append(nowlabel)
+        #             if smt[1] not in self.used:
+        #                 self.used[smt[1]] = []
+        #             self.used[smt[1]].append([nowlabel, i])
+        # todel = []
+        # for block in self.blocks:
+        #     if block not in self.pre or len(self.pre[block]) == 0 and block != 'entry':
+        #         todel.append(block)
         # for label in phi:
         #     for var in phi[label]:
         #         res = [llvmEnum.Phi, phi[label][var]['name'], typelist[var], []]
