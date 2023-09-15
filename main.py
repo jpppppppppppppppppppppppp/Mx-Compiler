@@ -3553,6 +3553,8 @@ class ASTBuilder:
                 self.generateFuncCall(where, typeclass(t=typeEnum.VOID), f"CLASS.{typetodo.name}.{typetodo.name}", [target], None)
         elif type(vars).__name__ == 'ASTAssignExprNode':
             pass
+        elif type(vars).__name__ == 'int':
+            pass
         else:
             raise Exception("TODO")
 
