@@ -208,16 +208,16 @@ class mem2reg:
         for _, arg in function[1]:
             varbank['entry'][arg] = arg
         temp = {}
-        for label in phi:
-            if label not in varbank:
-                varbank[label] = {}
-            for arg in phi[label]:
-                if arg not in temp:
-                    temp[arg] = 0
-                varbank[label][arg] = f'%{arg[1:]}.{temp[arg]}'
-                phi[label][arg]['name'] = f'%{arg[1:]}.{temp[arg]}'
-                temp[arg] += 1
-        task = ['entry']
+        # for label in phi:
+        #     if label not in varbank:
+        #         varbank[label] = {}
+        #     for arg in phi[label]:
+        #         if arg not in temp:
+        #             temp[arg] = 0
+        #         varbank[label][arg] = f'%{arg[1:]}.{temp[arg]}'
+        #         phi[label][arg]['name'] = f'%{arg[1:]}.{temp[arg]}'
+        #         temp[arg] += 1
+        # task = ['entry']
         # while len(task) > 0:
         #     self.rename(task, varbank, phi, df, parent, dt, typelist)
         # self.next.clear()
