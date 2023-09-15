@@ -828,9 +828,6 @@ class ASTBuilder:
 
     def buildBinaryExprContext(self, node):
         res = ASTBinaryExprNode(op=node.op.text, lhs=self.build(node.lhs), rhs=self.build(node.rhs))
-        if res.op == '*' and type(res.rhs).__name__ == "ASTConstExprContextNode" and res.rhs.value == 2:
-            res.op = '<<'
-            res.rhs.value = 1
         if type(res.rhs).__name__ == "ASTConstExprContextNode" and type(res.lhs).__name__ != "ASTConstExprContextNode" and (
                 res.op in ['+', '*', '&', '|', '^']) and res.rhs.type.type in [typeEnum.INT, typeEnum.BOOL]:
             lhs = res.lhs
