@@ -854,6 +854,9 @@ class ASTBuilder:
         if type(res.lhs).__name__ == "ASTIdentifierExprNode" and type(res.rhs).__name__ == "ASTIdentifierExprNode":
             if res.op in ['==', '!='] and (res.lhs.id == res.rhs.id):
                 return ASTConstExprContextNode(t=typeclass(t=typeEnum.BOOL), v=int((res.op == '==')))
+        if res.op == '*' and type(res.rhs).__name__ == "ASTConstExprContextNode" and res.rhs.value == 2:
+            res.op = '<<'
+            res.rhs.value = 1
         return res
 
     def buildAssignExprContext(self, node):
