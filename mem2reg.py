@@ -191,7 +191,7 @@ class mem2reg:
         #         phi[label] = {}
         #     if not update:
         #         break
-        # dt = {}
+        dt = {}
         # parent = {}
         # queue = ['entry']
         # while len(queue) != 0:
