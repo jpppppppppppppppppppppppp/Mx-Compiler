@@ -194,20 +194,20 @@ class mem2reg:
         dt = {}
         parent = {}
         queue = ['entry']
-        while len(queue) != 0:
-            front = queue.pop(0)
-            dt[front] = []
-            d.pop(front)
-            for item in d:
-                d[item].discard(front)
-                if len(d[item]) == 1 and item not in queue:
-                    queue.append(item)
-                    dt[front].append(item)
-                    parent[item] = front
-        varbank = {'entry': {}}
-        for _, arg in function[1]:
-            varbank['entry'][arg] = arg
-        temp = {}
+        # while len(queue) != 0:
+        #     front = queue.pop(0)
+        #     dt[front] = []
+        #     d.pop(front)
+        #     for item in d:
+        #         d[item].discard(front)
+        #         if len(d[item]) == 1 and item not in queue:
+        #             queue.append(item)
+        #             dt[front].append(item)
+        #             parent[item] = front
+        # varbank = {'entry': {}}
+        # for _, arg in function[1]:
+        #     varbank['entry'][arg] = arg
+        # temp = {}
         # for label in phi:
         #     if label not in varbank:
         #         varbank[label] = {}
