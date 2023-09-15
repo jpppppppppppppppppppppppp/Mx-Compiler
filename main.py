@@ -828,6 +828,9 @@ class ASTBuilder:
 
     def buildBinaryExprContext(self, node):
         res = ASTBinaryExprNode(op=node.op.text, lhs=self.build(node.lhs), rhs=self.build(node.rhs))
+        if res.op == '*' and type(res.rhs).__name__ == "ASTConstExprContextNode" and res.rhs.value == 2:
+            res.op = '<<'
+            res.rhs.value = 1
         if type(res.rhs).__name__ == "ASTConstExprContextNode" and type(res.lhs).__name__ != "ASTConstExprContextNode" and (
                 res.op in ['+', '*', '&', '|', '^']) and res.rhs.type.type in [typeEnum.INT, typeEnum.BOOL]:
             lhs = res.lhs
@@ -854,9 +857,6 @@ class ASTBuilder:
         if type(res.lhs).__name__ == "ASTIdentifierExprNode" and type(res.rhs).__name__ == "ASTIdentifierExprNode":
             if res.op in ['==', '!='] and (res.lhs.id == res.rhs.id):
                 return ASTConstExprContextNode(t=typeclass(t=typeEnum.BOOL), v=int((res.op == '==')))
-        if res.op == '*' and type(res.rhs).__name__ == "ASTConstExprContextNode" and res.rhs.value == 2:
-            res.op = '<<'
-            res.rhs.value = 1
         return res
 
     def buildAssignExprContext(self, node):
@@ -3551,7 +3551,7 @@ declare ptr @malloc(i32)
             if self.ClassBank[typetodo.name].ConstructFunc != ASTEmptyNode():
                 self.generateFuncCall(where, typeclass(t=typeEnum.VOID), f"CLASS.{typetodo.name}.{typetodo.name}", [target], None)
         else:
-            pass
+            raise Exception("TODO")
 
     def generategetelementptr(self, where, typetodo, target, id, newvar):
         if typetodo.dim > 0:
