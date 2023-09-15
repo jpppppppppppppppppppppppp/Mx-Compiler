@@ -1603,49 +1603,50 @@ class ASTBuilder:
 
         for child in node.children:
             self.llvm(child)
-        self.Mem2Reg()
-        output.write('''declare void @print(ptr)
-declare void @println(ptr)
-declare void @printInt(i32)
-declare void @printlnInt(i32)
-declare ptr @getString()
-declare i32 @getInt()
-declare ptr @toString(i32)
-declare ptr @string.string()
-declare i32 @string.length(ptr)
-declare ptr @string.substring(ptr, i32, i32)
-declare i32 @string.parseInt(ptr)
-declare i32 @string.ord(ptr, i32)
-declare ptr @string.add(ptr, ptr)
-declare i1 @string.equal(ptr, ptr)
-declare i1 @string.notEqual(ptr, ptr)
-declare i1 @string.less(ptr, ptr)
-declare i1 @string.lessOrEqual(ptr, ptr)
-declare i1 @string.greater(ptr, ptr)
-declare i1 @string.greaterOrEqual(ptr, ptr)
-declare i32 @__array.size(ptr)
-declare ptr @__newPtrArray(i32)
-declare ptr @__newIntArray(i32)
-declare ptr @__newBoolArray(i32)
-declare ptr @malloc(i32)
+        # self.Mem2Reg()
 
-
-''')
-        for smt in self.globalvars:
-            output.write(llvmstring(smt))
-        for funcname in self.llvmfunc:
-            output.write(f"define {self.llvmfunc[funcname][0]} @{funcname}(")
-            for i in range(len(self.llvmfunc[funcname][1])):
-                if i != 0:
-                    output.write(', ')
-                output.write(self.llvmfunc[funcname][1][i][0] + ' ' + self.llvmfunc[funcname][1][i][1])
-            output.write("){\n")
-            for i in range(len(self.llvmfunc[funcname][2])):
-                if len(self.llvmfunc[funcname][2][i]) > 1:
-                    for j in range(len(self.llvmfunc[funcname][2][i])):
-                        output.write(llvmstring(self.llvmfunc[funcname][2][i][j]))
-                    output.write('\n')
-            output.write('}\n')
+    #         output.write('''declare void @print(ptr)
+    # declare void @println(ptr)
+    # declare void @printInt(i32)
+    # declare void @printlnInt(i32)
+    # declare ptr @getString()
+    # declare i32 @getInt()
+    # declare ptr @toString(i32)
+    # declare ptr @string.string()
+    # declare i32 @string.length(ptr)
+    # declare ptr @string.substring(ptr, i32, i32)
+    # declare i32 @string.parseInt(ptr)
+    # declare i32 @string.ord(ptr, i32)
+    # declare ptr @string.add(ptr, ptr)
+    # declare i1 @string.equal(ptr, ptr)
+    # declare i1 @string.notEqual(ptr, ptr)
+    # declare i1 @string.less(ptr, ptr)
+    # declare i1 @string.lessOrEqual(ptr, ptr)
+    # declare i1 @string.greater(ptr, ptr)
+    # declare i1 @string.greaterOrEqual(ptr, ptr)
+    # declare i32 @__array.size(ptr)
+    # declare ptr @__newPtrArray(i32)
+    # declare ptr @__newIntArray(i32)
+    # declare ptr @__newBoolArray(i32)
+    # declare ptr @malloc(i32)
+    #
+    #
+    # ''')
+    # for smt in self.globalvars:
+    #     output.write(llvmstring(smt))
+    # for funcname in self.llvmfunc:
+    #     output.write(f"define {self.llvmfunc[funcname][0]} @{funcname}(")
+    #     for i in range(len(self.llvmfunc[funcname][1])):
+    #         if i != 0:
+    #             output.write(', ')
+    #         output.write(self.llvmfunc[funcname][1][i][0] + ' ' + self.llvmfunc[funcname][1][i][1])
+    #     output.write("){\n")
+    #     for i in range(len(self.llvmfunc[funcname][2])):
+    #         if len(self.llvmfunc[funcname][2][i]) > 1:
+    #             for j in range(len(self.llvmfunc[funcname][2][i])):
+    #                 output.write(llvmstring(self.llvmfunc[funcname][2][i][j]))
+    #             output.write('\n')
+    #     output.write('}\n')
 
     def llvmClassScope(self, node):
         self.sizebank[node.id] = 0
