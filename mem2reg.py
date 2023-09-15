@@ -174,26 +174,26 @@ class mem2reg:
                         phi[dfs] = {}
                     if vars not in phi[dfs]:
                         phi[dfs][vars] = {}
-        while True:
-            update = False
-            toadd = set()
-            for label in phi:
-                for dfs in df[label]:
-                    if dfs not in phi:
-                        toadd.add(dfs)
-                        update = True
-                    else:
-                        for vars in phi[label]:
-                            if vars not in phi[dfs]:
-                                phi[dfs][vars] = {}
-                                update = True
-            for label in toadd:
-                phi[label] = {}
-            if not update:
-                break
-        dt = {}
-        parent = {}
-        queue = ['entry']
+        # while True:
+        #     update = False
+        #     toadd = set()
+        #     for label in phi:
+        #         for dfs in df[label]:
+        #             if dfs not in phi:
+        #                 toadd.add(dfs)
+        #                 update = True
+        #             else:
+        #                 for vars in phi[label]:
+        #                     if vars not in phi[dfs]:
+        #                         phi[dfs][vars] = {}
+        #                         update = True
+        #     for label in toadd:
+        #         phi[label] = {}
+        #     if not update:
+        #         break
+        # dt = {}
+        # parent = {}
+        # queue = ['entry']
         # while len(queue) != 0:
         #     front = queue.pop(0)
         #     dt[front] = []
