@@ -3468,7 +3468,7 @@ class ASTBuilder:
                 self.generateFuncCall(where, typetodo, f"CLASS.{bodytype.name}.{vars.id}", args, target)
         elif type(vars).__name__ == "ASTTriExprNode":
             if type(vars.condition).__name__ == "ASTConstExprContextNode":
-                pass
+                raise Exception("TODO")
             else:
                 convar = f"%._{self.Scopes[-1].tempvar}"
                 self.Scopes[-1].tempvar += 1
@@ -3552,7 +3552,7 @@ class ASTBuilder:
             if self.ClassBank[typetodo.name].ConstructFunc != ASTEmptyNode():
                 self.generateFuncCall(where, typeclass(t=typeEnum.VOID), f"CLASS.{typetodo.name}.{typetodo.name}", [target], None)
         else:
-            pass
+            raise Exception("TODO")
 
     def generategetelementptr(self, where, typetodo, target, id, newvar):
         if typetodo.dim > 0:
@@ -3587,7 +3587,7 @@ class ASTBuilder:
             elif value.type.type == typeEnum.NULL:
                 where.append([llvmEnum.Store, 'ptr', 'null', self.getname(target)])
         else:
-            pass
+            raise Exception("TODO")
 
     def generateFuncCall(self, where, retType, funcname, arglist, retwhere):
         if funcname in self.symbol:
@@ -3639,7 +3639,7 @@ class ASTBuilder:
             where.append([llvmEnum.FuncCall, newvar, 'i1', funcname, res])
             where.append([llvmEnum.Zext, retwhere, newvar])
         else:
-            pass
+            raise Exception("TODO")
 
     def generateret(self, where, typetodo, retNode):
         if typetodo == typeclass(t=typeEnum.VOID):
@@ -3664,7 +3664,7 @@ class ASTBuilder:
         elif typetodo.type == typeEnum.BOOL:
             where.append([llvmEnum.Alloca, target, 'i32'])
         else:
-            pass
+            raise Exception("TODO")
 
     def getname(self, name):
         for i in range(len(self.NameSpace) - 1, -1, -1):
