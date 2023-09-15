@@ -135,10 +135,10 @@ class mem2reg:
                             self.used[arg[1]] = []
                         self.used[arg[1]].append([nowlabel, i])
         d = {}
-        for label in self.blocks:
-            d[label] = set()
-            for labels in self.blocks:
-                d[label].add(labels)
+        # for label in self.blocks:
+        #     d[label] = set()
+        #     for labels in self.blocks:
+        #         d[label].add(labels)
         # while True:
         #     update = False
         #     for label in d:
