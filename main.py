@@ -1603,50 +1603,49 @@ class ASTBuilder:
 
         for child in node.children:
             self.llvm(child)
-        # self.Mem2Reg()
+        self.Mem2Reg()
+        output.write('''declare void @print(ptr)
+declare void @println(ptr)
+declare void @printInt(i32)
+declare void @printlnInt(i32)
+declare ptr @getString()
+declare i32 @getInt()
+declare ptr @toString(i32)
+declare ptr @string.string()
+declare i32 @string.length(ptr)
+declare ptr @string.substring(ptr, i32, i32)
+declare i32 @string.parseInt(ptr)
+declare i32 @string.ord(ptr, i32)
+declare ptr @string.add(ptr, ptr)
+declare i1 @string.equal(ptr, ptr)
+declare i1 @string.notEqual(ptr, ptr)
+declare i1 @string.less(ptr, ptr)
+declare i1 @string.lessOrEqual(ptr, ptr)
+declare i1 @string.greater(ptr, ptr)
+declare i1 @string.greaterOrEqual(ptr, ptr)
+declare i32 @__array.size(ptr)
+declare ptr @__newPtrArray(i32)
+declare ptr @__newIntArray(i32)
+declare ptr @__newBoolArray(i32)
+declare ptr @malloc(i32)
 
-    #         output.write('''declare void @print(ptr)
-    # declare void @println(ptr)
-    # declare void @printInt(i32)
-    # declare void @printlnInt(i32)
-    # declare ptr @getString()
-    # declare i32 @getInt()
-    # declare ptr @toString(i32)
-    # declare ptr @string.string()
-    # declare i32 @string.length(ptr)
-    # declare ptr @string.substring(ptr, i32, i32)
-    # declare i32 @string.parseInt(ptr)
-    # declare i32 @string.ord(ptr, i32)
-    # declare ptr @string.add(ptr, ptr)
-    # declare i1 @string.equal(ptr, ptr)
-    # declare i1 @string.notEqual(ptr, ptr)
-    # declare i1 @string.less(ptr, ptr)
-    # declare i1 @string.lessOrEqual(ptr, ptr)
-    # declare i1 @string.greater(ptr, ptr)
-    # declare i1 @string.greaterOrEqual(ptr, ptr)
-    # declare i32 @__array.size(ptr)
-    # declare ptr @__newPtrArray(i32)
-    # declare ptr @__newIntArray(i32)
-    # declare ptr @__newBoolArray(i32)
-    # declare ptr @malloc(i32)
-    #
-    #
-    # ''')
-    # for smt in self.globalvars:
-    #     output.write(llvmstring(smt))
-    # for funcname in self.llvmfunc:
-    #     output.write(f"define {self.llvmfunc[funcname][0]} @{funcname}(")
-    #     for i in range(len(self.llvmfunc[funcname][1])):
-    #         if i != 0:
-    #             output.write(', ')
-    #         output.write(self.llvmfunc[funcname][1][i][0] + ' ' + self.llvmfunc[funcname][1][i][1])
-    #     output.write("){\n")
-    #     for i in range(len(self.llvmfunc[funcname][2])):
-    #         if len(self.llvmfunc[funcname][2][i]) > 1:
-    #             for j in range(len(self.llvmfunc[funcname][2][i])):
-    #                 output.write(llvmstring(self.llvmfunc[funcname][2][i][j]))
-    #             output.write('\n')
-    #     output.write('}\n')
+
+''')
+        for smt in self.globalvars:
+            output.write(llvmstring(smt))
+        for funcname in self.llvmfunc:
+            output.write(f"define {self.llvmfunc[funcname][0]} @{funcname}(")
+            for i in range(len(self.llvmfunc[funcname][1])):
+                if i != 0:
+                    output.write(', ')
+                output.write(self.llvmfunc[funcname][1][i][0] + ' ' + self.llvmfunc[funcname][1][i][1])
+            output.write("){\n")
+            for i in range(len(self.llvmfunc[funcname][2])):
+                if len(self.llvmfunc[funcname][2][i]) > 1:
+                    for j in range(len(self.llvmfunc[funcname][2][i])):
+                        output.write(llvmstring(self.llvmfunc[funcname][2][i][j]))
+                    output.write('\n')
+            output.write('}\n')
 
     def llvmClassScope(self, node):
         self.sizebank[node.id] = 0
@@ -1879,7 +1878,7 @@ class ASTBuilder:
         elif typetodo.type == typeEnum.VOID:
             where.append([llvmEnum.ReturnVoid])
         else:
-            pass
+            raise Exception("TODO")
 
     def llvmASTVariabledeclarationNode(self, node):
         for inits in node.init:
@@ -1891,7 +1890,7 @@ class ASTBuilder:
 
     def llvmInitASTArrayExprNode(self, typetodo, init):
         if self.Scopes[-1].type == ScopeEnum.Global:
-            pass
+            raise Exception("TODO")
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
@@ -1910,7 +1909,7 @@ class ASTBuilder:
 
     def llvmInitASTTriExprNode(self, typetodo, init):
         if self.Scopes[-1].type == ScopeEnum.Global:
-            pass
+            raise Exception("TODO")
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
@@ -2091,7 +2090,7 @@ class ASTBuilder:
             self.generatestore(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], self.typeget(node)[0], newvars, newvar)
             return newvars
         else:
-            pass
+            raise Exception("TODO")
 
     def llvmASTMemberFuncExprNode(self, node):
         bodytype = self.typeget(node.body)[0]
@@ -2585,7 +2584,7 @@ class ASTBuilder:
 
     def llvmInitASTMemberFuncExprNode(self, typetodo, init):
         if self.Scopes[-1].type == ScopeEnum.Global:
-            pass
+            raise Exception("TODO")
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
@@ -2892,7 +2891,7 @@ class ASTBuilder:
                     elif node.cmd == 'Continue':
                         self.generatejump(where, self.Scopes[i].continuelabel)
                     else:
-                        pass
+                        raise Exception("TODO")
                     return
 
     def llvmASTBranchStatementNode(self, node):
@@ -3182,7 +3181,7 @@ class ASTBuilder:
             self.generateload(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], self.typeget(vars)[0], newvar, target)
         elif type(vars).__name__ == "ASTBinaryExprNode":
             if typetodo.dim > 0:
-                pass
+                raise Exception("TODO")
             elif typetodo.type == typeEnum.INT:
                 if type(vars.lhs).__name__ == "ASTConstExprContextNode":
                     lhsnewvar = str(vars.lhs.value)
@@ -3347,7 +3346,7 @@ class ASTBuilder:
                         self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append([llvmEnum.Icmp, frombool, self.logic[vars.op], 'ptr', lhsvar, rhsvar])
                         self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append([llvmEnum.Zext, target, frombool])
                 else:
-                    pass
+                    raise Exception("TODO")
             elif typetodo.type == typeEnum.STRING:
                 if vars.op == '+':
                     if type(vars.lhs).__name__ == "ASTConstExprContextNode":
@@ -3368,9 +3367,9 @@ class ASTBuilder:
                         self.generateload(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], typetodo, vars.rhs, rhsnewvar)
                     self.generateFuncCall(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], typetodo, 'string.add', [lhsnewvar, rhsnewvar], target)
                 else:
-                    pass
+                    raise Exception("TODO")
             else:
-                pass
+                raise Exception("TODO")
         elif type(vars).__name__ == "ASTUnaryExprNode":
             if vars.op == '+':
                 self.generateload(where, typetodo, vars.body, target)
@@ -3468,7 +3467,7 @@ class ASTBuilder:
                 self.generateFuncCall(where, typetodo, f"CLASS.{bodytype.name}.{vars.id}", args, target)
         elif type(vars).__name__ == "ASTTriExprNode":
             if type(vars.condition).__name__ == "ASTConstExprContextNode":
-                pass
+                raise Exception("TODO")
             else:
                 convar = f"%._{self.Scopes[-1].tempvar}"
                 self.Scopes[-1].tempvar += 1
@@ -3551,38 +3550,6 @@ class ASTBuilder:
             self.generateFuncCall(where, typetodo, 'malloc', [str(self.sizebank[typetodo.name])], target)
             if self.ClassBank[typetodo.name].ConstructFunc != ASTEmptyNode():
                 self.generateFuncCall(where, typeclass(t=typeEnum.VOID), f"CLASS.{typetodo.name}.{typetodo.name}", [target], None)
-        elif type(vars).__name__ == 'ASTAssignExprNode':
-            pass
-        elif type(vars).__name__ == 'int':
-            pass
-        elif type(vars).__name__ == 'ASTConstExprContextNode':
-            pass
-        elif type(vars).__name__ == 'ASTEmptyNode':
-            pass
-        elif type(vars).__name__ == 'ASTVariabledeclarationNode':
-            pass
-        elif type(vars).__name__ == 'ASTInitializeContextNode':
-            pass
-        elif type(vars).__name__ == 'ASTBlockSmtNode':
-            pass
-        elif type(vars).__name__ == 'ASTFunctiondeclarationContextNode':
-            pass
-        elif type(vars).__name__ == 'ASTFuncparamContextNode':
-            pass
-        elif type(vars).__name__ == 'ASTBranchStatementNode':
-            pass
-        elif type(vars).__name__ == 'ASTLoopForNode':
-            pass
-        elif type(vars).__name__ == 'ASTLoopWhileNode':
-            pass
-        elif type(vars).__name__ == 'ASTControlNode':
-            pass
-        elif type(vars).__name__ == 'ASTClassdeclarationContextNode':
-            pass
-        elif type(vars).__name__ == 'ASTBodyRootNode':
-            pass
-        elif type(vars).__name__ == 'list':
-            pass
         else:
             raise Exception("TODO")
 
@@ -3719,6 +3686,9 @@ class ASTBuilder:
     #         self.translator.translatefunction(func, self.llvmfunc[func])
     #     self.translator.write()
     def riscv(self, flag):
+        maxarg = 0
+        for func in self.llvmfunc:
+            maxarg = max(maxarg, len(self.llvmfunc[func][1]) - 8)
         self.translator.translate(self.globalvars, self.llvmfunc, self.dt, flag)
 
     def Mem2Reg(self):
@@ -3806,7 +3776,7 @@ if __name__ == "__main__":
             flag = builder.check(ast)
             builder.llvm(ast)
             output.flush()
-            # builder.riscv(True)
+            builder.riscv(True)
         except Exception as e:
             flag = False
         if not flag:
