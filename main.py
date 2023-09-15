@@ -3555,6 +3555,8 @@ class ASTBuilder:
             pass
         elif type(vars).__name__ == 'int':
             pass
+        elif type(vars).__name__ == 'ASTConstExprContextNode':
+            pass
         else:
             raise Exception("TODO")
 
