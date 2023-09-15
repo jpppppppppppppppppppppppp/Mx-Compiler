@@ -3581,6 +3581,8 @@ class ASTBuilder:
             pass
         elif type(vars).__name__ == 'ASTBodyRootNode':
             pass
+        elif type(vars).__name__ == 'list':
+            pass
         else:
             raise Exception("TODO")
 
