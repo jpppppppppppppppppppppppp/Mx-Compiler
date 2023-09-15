@@ -3552,7 +3552,7 @@ class ASTBuilder:
             if self.ClassBank[typetodo.name].ConstructFunc != ASTEmptyNode():
                 self.generateFuncCall(where, typeclass(t=typeEnum.VOID), f"CLASS.{typetodo.name}.{typetodo.name}", [target], None)
         else:
-            pass
+            raise Exception("TODO")
 
     def generategetelementptr(self, where, typetodo, target, id, newvar):
         if typetodo.dim > 0:
