@@ -218,8 +218,8 @@ class mem2reg:
                 phi[label][arg]['name'] = f'%{arg[1:]}.{temp[arg]}'
                 temp[arg] += 1
         task = ['entry']
-        while len(task) > 0:
-            self.rename(task, varbank, phi, df, parent, dt, typelist)
+        # while len(task) > 0:
+        #     self.rename(task, varbank, phi, df, parent, dt, typelist)
         # self.next.clear()
         # self.pre.clear()
         # for block in function[2]:
