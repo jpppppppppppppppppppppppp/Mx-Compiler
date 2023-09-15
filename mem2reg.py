@@ -139,22 +139,22 @@ class mem2reg:
             d[label] = set()
             for labels in self.blocks:
                 d[label].add(labels)
-        while True:
-            update = False
-            for label in d:
-                newd = set()
-                if len(self.pre[label]) != 0:
-                    for temp in self.blocks:
-                        newd.add(temp)
-                for pre in self.pre[label]:
-                    newd = newd.intersection(d[pre])
-                newd.add(label)
-                if newd == d[label]:
-                    continue
-                update = True
-                d[label] = newd
-            if not update:
-                break
+        # while True:
+        #     update = False
+        #     for label in d:
+        #         newd = set()
+        #         if len(self.pre[label]) != 0:
+        #             for temp in self.blocks:
+        #                 newd.add(temp)
+        #         for pre in self.pre[label]:
+        #             newd = newd.intersection(d[pre])
+        #         newd.add(label)
+        #         if newd == d[label]:
+        #             continue
+        #         update = True
+        #         d[label] = newd
+        #     if not update:
+        #         break
         df = {}
         # for label in self.blocks:
         #     if label not in df:
