@@ -3468,7 +3468,7 @@ class ASTBuilder:
                 self.generateFuncCall(where, typetodo, f"CLASS.{bodytype.name}.{vars.id}", args, target)
         elif type(vars).__name__ == "ASTTriExprNode":
             if type(vars.condition).__name__ == "ASTConstExprContextNode":
-                raise Exception("TODO")
+                pass
             else:
                 convar = f"%._{self.Scopes[-1].tempvar}"
                 self.Scopes[-1].tempvar += 1
@@ -3552,7 +3552,7 @@ class ASTBuilder:
             if self.ClassBank[typetodo.name].ConstructFunc != ASTEmptyNode():
                 self.generateFuncCall(where, typeclass(t=typeEnum.VOID), f"CLASS.{typetodo.name}.{typetodo.name}", [target], None)
         else:
-            raise Exception("TODO")
+            pass
 
     def generategetelementptr(self, where, typetodo, target, id, newvar):
         if typetodo.dim > 0:
@@ -3587,7 +3587,7 @@ class ASTBuilder:
             elif value.type.type == typeEnum.NULL:
                 where.append([llvmEnum.Store, 'ptr', 'null', self.getname(target)])
         else:
-            raise Exception("TODO")
+            pass
 
     def generateFuncCall(self, where, retType, funcname, arglist, retwhere):
         if funcname in self.symbol:
