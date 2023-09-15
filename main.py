@@ -3557,6 +3557,30 @@ class ASTBuilder:
             pass
         elif type(vars).__name__ == 'ASTConstExprContextNode':
             pass
+        elif type(vars).__name__ == 'ASTEmptyNode':
+            pass
+        elif type(vars).__name__ == 'ASTVariabledeclarationNode':
+            pass
+        elif type(vars).__name__ == 'ASTInitializeContextNode':
+            pass
+        elif type(vars).__name__ == 'ASTBlockSmtNode':
+            pass
+        elif type(vars).__name__ == 'ASTFunctiondeclarationContextNode':
+            pass
+        elif type(vars).__name__ == 'ASTFuncparamContextNode':
+            pass
+        elif type(vars).__name__ == 'ASTBranchStatementNode':
+            pass
+        elif type(vars).__name__ == 'ASTLoopForNode':
+            pass
+        elif type(vars).__name__ == 'ASTLoopWhileNode':
+            pass
+        elif type(vars).__name__ == 'ASTControlNode':
+            pass
+        elif type(vars).__name__ == 'ASTClassdeclarationContextNode':
+            pass
+        elif type(vars).__name__ == 'ASTBodyRootNode':
+            pass
         else:
             raise Exception("TODO")
 
