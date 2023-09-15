@@ -3587,7 +3587,7 @@ class ASTBuilder:
             elif value.type.type == typeEnum.NULL:
                 where.append([llvmEnum.Store, 'ptr', 'null', self.getname(target)])
         else:
-            pass
+            raise Exception("TODO")
 
     def generateFuncCall(self, where, retType, funcname, arglist, retwhere):
         if funcname in self.symbol:
