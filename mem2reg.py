@@ -156,24 +156,24 @@ class mem2reg:
             if not update:
                 break
         df = {}
-        for label in self.blocks:
-            if label not in df:
-                df[label] = set()
-            for n in d[label]:
-                for suc in self.next[label]:
-                    if n not in d[suc] or n == suc:
-                        if n not in df:
-                            df[n] = set()
-                        df[n].add(suc)
-        phi = {}
-        for vars in self.allocavar:
-            for label in self.defd[vars]:
-                source, line = self.defd[vars][label]
-                for dfs in df[label]:
-                    if dfs not in phi:
-                        phi[dfs] = {}
-                    if vars not in phi[dfs]:
-                        phi[dfs][vars] = {}
+        # for label in self.blocks:
+        #     if label not in df:
+        #         df[label] = set()
+        #     for n in d[label]:
+        #         for suc in self.next[label]:
+        #             if n not in d[suc] or n == suc:
+        #                 if n not in df:
+        #                     df[n] = set()
+        #                 df[n].add(suc)
+        # phi = {}
+        # for vars in self.allocavar:
+        #     for label in self.defd[vars]:
+        #         source, line = self.defd[vars][label]
+        #         for dfs in df[label]:
+        #             if dfs not in phi:
+        #                 phi[dfs] = {}
+        #             if vars not in phi[dfs]:
+        #                 phi[dfs][vars] = {}
         # while True:
         #     update = False
         #     toadd = set()
