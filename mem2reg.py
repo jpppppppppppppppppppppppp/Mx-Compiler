@@ -260,11 +260,11 @@ class mem2reg:
                     if source not in ['name', 'type']:
                         res[-1].append([phi[label][var][source], source])
                 self.blocks[label].insert(1, res)
-        for todo in todel:
-            for i in range(len(function[2])):
-                if function[2][i][0][1] == todo:
-                    function[2].pop(i)
-                    break
+        # for todo in todel:
+        #     for i in range(len(function[2])):
+        #         if function[2][i][0][1] == todo:
+        #             function[2].pop(i)
+        #             break
         return dt
 
     def rename(self, task, varbank, phi, df, parent, dt, typelist):
