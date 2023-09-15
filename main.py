@@ -3776,7 +3776,7 @@ if __name__ == "__main__":
             flag = builder.check(ast)
             builder.llvm(ast)
             output.flush()
-            builder.riscv(True)
+            # builder.riscv(True)
         except Exception as e:
             flag = False
         if not flag:

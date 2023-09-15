@@ -32,7 +32,7 @@ class regalloc:
         for function in allfunc:
             ir[function] = self.make(function, allfunc[function], dt[function])
             while True:
-                mvlib, movelist, graph = self.staticAnalyze(ir[function])
+                mvlib, movelist, graph, levelbank = self.staticAnalyze(ir[function])
                 origingraph = {}
                 for reg in graph:
                     origingraph[reg] = graph[reg].copy()
@@ -53,7 +53,8 @@ class regalloc:
                     elif len(freezeworklist) != 0:
                         self.freeze(freezeworklist, simplifyworklist, movelist, mvlib, activemMove, coalescedNodes, frozenlist, graph)
                     elif len(spillworklist) != 0:
-                        self.selectspill(spillworklist, simplifyworklist, movelist, activemMove, mvlib, coalescedNodes, frozenlist, graph, freezeworklist)
+                        self.selectspill(levelbank, spillworklist, simplifyworklist, movelist, activemMove, mvlib, coalescedNodes, frozenlist, graph,
+                                         freezeworklist)
                 coloredNode, spilledNode = self.Assigncolors(selectStack, graph, coalescedNodes)
                 if len(spilledNode) != 0:
                     self.ReWrite(spilledNode, ir[function])
@@ -89,6 +90,7 @@ class regalloc:
         needra = False
         mvlib = []
         mvlist = {}
+        levelbank = {}
         for label in function:
             for smt in label:
                 if smt[0] == lrEnum.label:
@@ -103,6 +105,8 @@ class regalloc:
                     alldefd[nowlabel] = {'sp'}
                     allused[nowlabel] = set()
                 elif smt[0] == lrEnum.mv:
+                    levelbank[smt[1]] = -1
+                    levelbank[smt[2]] = -1
                     mvlib.append([smt[1], smt[2]])
                     if smt[1] not in mvlist:
                         mvlist[smt[1]] = []
@@ -117,6 +121,8 @@ class regalloc:
                         defd[nowlabel].add(smt[1])
                     alldefd[nowlabel].add(smt[1])
                 elif smt[0] == lrEnum.lw:
+                    levelbank[smt[1]] = -1
+                    levelbank[smt[3]] = -1
                     if smt[3] not in alldefd[nowlabel]:
                         used[nowlabel].add(smt[3])
                     allused[nowlabel].add(smt[3])
@@ -124,6 +130,7 @@ class regalloc:
                         defd[nowlabel].add(smt[1])
                     alldefd[nowlabel].add(smt[1])
                 elif smt[0] == lrEnum.binary:
+                    levelbank[smt[2]] = 1
                     if smt[3] not in alldefd[nowlabel]:
                         used[nowlabel].add(smt[3])
                     allused[nowlabel].add(smt[3])
@@ -134,6 +141,7 @@ class regalloc:
                         defd[nowlabel].add(smt[2])
                     alldefd[nowlabel].add(smt[2])
                 elif smt[0] == lrEnum.li:
+                    levelbank[smt[1]] = 1
                     if smt[1] not in allused[nowlabel]:
                         defd[nowlabel].add(smt[1])
                     alldefd[nowlabel].add(smt[1])
@@ -146,6 +154,7 @@ class regalloc:
                             defd[nowlabel].add(reg)
                         alldefd[nowlabel].add(reg)
                 elif smt[0] == lrEnum.sw:
+                    levelbank[smt[1]] = -1
                     if smt[1] not in alldefd[nowlabel]:
                         used[nowlabel].add(smt[1])
                     allused[nowlabel].add(smt[1])
@@ -153,10 +162,12 @@ class regalloc:
                         used[nowlabel].add(smt[3])
                     allused[nowlabel].add(smt[3])
                 elif smt[0] == lrEnum.lui:
+                    levelbank[smt[1]] = -1
                     if smt[1] not in allused[nowlabel]:
                         defd[nowlabel].add(smt[1])
                     alldefd[nowlabel].add(smt[1])
                 elif smt[0] == lrEnum.icmp:
+                    levelbank[smt[2]] = 1
                     if smt[2] not in allused[nowlabel]:
                         defd[nowlabel].add(smt[2])
                     alldefd[nowlabel].add(smt[2])
@@ -171,6 +182,7 @@ class regalloc:
                         pre[smt[2]] = set()
                     pre[smt[2]].add(nowlabel)
                 elif smt[0] == lrEnum.bnez:
+                    levelbank[smt[1]] = 1
                     if nowlabel not in next:
                         next[nowlabel] = set()
                     next[nowlabel].add(smt[3])
@@ -181,6 +193,7 @@ class regalloc:
                         used[nowlabel].add(smt[1])
                     allused[nowlabel].add(smt[1])
                 elif smt[0] == lrEnum.binaryi:
+                    levelbank[smt[2]] = 1
                     if smt[3] not in alldefd[nowlabel]:
                         used[nowlabel].add(smt[3])
                     allused[nowlabel].add(smt[3])
@@ -323,7 +336,7 @@ class regalloc:
             edges[reg].discard('sp')
         if 'sp' in edges:
             edges.pop('sp')
-        return mvlib, mvlist, edges
+        return mvlib, mvlist, edges, levelbank
 
     def make(self, funcname, array, dt):
         self.varnum = 0
@@ -1086,8 +1099,15 @@ class regalloc:
                     if v not in simplifyworklist:
                         simplifyworklist.append(v)
 
-    def selectspill(self, spillworklist, simplifyworklist, movelist, activemMove, mvlib, coalescedNodes, frozenlist, graph, freezeworklist):
-        u = spillworklist.pop(0)
+    def selectspill(self, levelbank, spillworklist, simplifyworklist, movelist, activemMove, mvlib, coalescedNodes, frozenlist, graph, freezeworklist):
+        max = -2
+        maxind = ''
+        for temp in spillworklist:
+            if levelbank[temp] >= max:
+                max = levelbank[temp]
+                maxind = temp
+        u = maxind
+        spillworklist.remove(u)
         simplifyworklist.append(u)
         if u not in movelist:
             movelist[u] = []
