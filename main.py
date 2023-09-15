@@ -3551,7 +3551,7 @@ declare ptr @malloc(i32)
             if self.ClassBank[typetodo.name].ConstructFunc != ASTEmptyNode():
                 self.generateFuncCall(where, typeclass(t=typeEnum.VOID), f"CLASS.{typetodo.name}.{typetodo.name}", [target], None)
         else:
-            raise Exception("TODO")
+            pass
 
     def generategetelementptr(self, where, typetodo, target, id, newvar):
         if typetodo.dim > 0:
