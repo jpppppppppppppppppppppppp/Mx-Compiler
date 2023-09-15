@@ -1879,7 +1879,7 @@ class ASTBuilder:
         elif typetodo.type == typeEnum.VOID:
             where.append([llvmEnum.ReturnVoid])
         else:
-            raise Exception("TODO")
+            pass
 
     def llvmASTVariabledeclarationNode(self, node):
         for inits in node.init:
@@ -1891,7 +1891,7 @@ class ASTBuilder:
 
     def llvmInitASTArrayExprNode(self, typetodo, init):
         if self.Scopes[-1].type == ScopeEnum.Global:
-            raise Exception("TODO")
+            pass
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
@@ -1910,7 +1910,7 @@ class ASTBuilder:
 
     def llvmInitASTTriExprNode(self, typetodo, init):
         if self.Scopes[-1].type == ScopeEnum.Global:
-            raise Exception("TODO")
+            pass
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
@@ -2091,7 +2091,7 @@ class ASTBuilder:
             self.generatestore(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], self.typeget(node)[0], newvars, newvar)
             return newvars
         else:
-            raise Exception("TODO")
+            pass
 
     def llvmASTMemberFuncExprNode(self, node):
         bodytype = self.typeget(node.body)[0]
@@ -2585,7 +2585,7 @@ class ASTBuilder:
 
     def llvmInitASTMemberFuncExprNode(self, typetodo, init):
         if self.Scopes[-1].type == ScopeEnum.Global:
-            raise Exception("TODO")
+            pass
         else:
             where = self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim]
             varname = f"%.{init.id}.{len(self.Scopes)}.{self.Scopes[-1].dim}"
@@ -2892,7 +2892,7 @@ class ASTBuilder:
                     elif node.cmd == 'Continue':
                         self.generatejump(where, self.Scopes[i].continuelabel)
                     else:
-                        raise Exception("TODO")
+                        pass
                     return
 
     def llvmASTBranchStatementNode(self, node):
@@ -3182,7 +3182,7 @@ class ASTBuilder:
             self.generateload(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], self.typeget(vars)[0], newvar, target)
         elif type(vars).__name__ == "ASTBinaryExprNode":
             if typetodo.dim > 0:
-                raise Exception("TODO")
+                pass
             elif typetodo.type == typeEnum.INT:
                 if type(vars.lhs).__name__ == "ASTConstExprContextNode":
                     lhsnewvar = str(vars.lhs.value)
@@ -3347,7 +3347,7 @@ class ASTBuilder:
                         self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append([llvmEnum.Icmp, frombool, self.logic[vars.op], 'ptr', lhsvar, rhsvar])
                         self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append([llvmEnum.Zext, target, frombool])
                 else:
-                    raise Exception("TODO")
+                    pass
             elif typetodo.type == typeEnum.STRING:
                 if vars.op == '+':
                     if type(vars.lhs).__name__ == "ASTConstExprContextNode":
@@ -3368,9 +3368,9 @@ class ASTBuilder:
                         self.generateload(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], typetodo, vars.rhs, rhsnewvar)
                     self.generateFuncCall(self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim], typetodo, 'string.add', [lhsnewvar, rhsnewvar], target)
                 else:
-                    raise Exception("TODO")
+                    pass
             else:
-                raise Exception("TODO")
+                pass
         elif type(vars).__name__ == "ASTUnaryExprNode":
             if vars.op == '+':
                 self.generateload(where, typetodo, vars.body, target)
@@ -3468,7 +3468,7 @@ class ASTBuilder:
                 self.generateFuncCall(where, typetodo, f"CLASS.{bodytype.name}.{vars.id}", args, target)
         elif type(vars).__name__ == "ASTTriExprNode":
             if type(vars.condition).__name__ == "ASTConstExprContextNode":
-                raise Exception("TODO")
+                pass
             else:
                 convar = f"%._{self.Scopes[-1].tempvar}"
                 self.Scopes[-1].tempvar += 1
@@ -3552,7 +3552,7 @@ class ASTBuilder:
             if self.ClassBank[typetodo.name].ConstructFunc != ASTEmptyNode():
                 self.generateFuncCall(where, typeclass(t=typeEnum.VOID), f"CLASS.{typetodo.name}.{typetodo.name}", [target], None)
         else:
-            raise Exception("TODO")
+            pass
 
     def generategetelementptr(self, where, typetodo, target, id, newvar):
         if typetodo.dim > 0:
@@ -3587,7 +3587,7 @@ class ASTBuilder:
             elif value.type.type == typeEnum.NULL:
                 where.append([llvmEnum.Store, 'ptr', 'null', self.getname(target)])
         else:
-            raise Exception("TODO")
+            pass
 
     def generateFuncCall(self, where, retType, funcname, arglist, retwhere):
         if funcname in self.symbol:
@@ -3639,7 +3639,7 @@ class ASTBuilder:
             where.append([llvmEnum.FuncCall, newvar, 'i1', funcname, res])
             where.append([llvmEnum.Zext, retwhere, newvar])
         else:
-            raise Exception("TODO")
+            pass
 
     def generateret(self, where, typetodo, retNode):
         if typetodo == typeclass(t=typeEnum.VOID):
@@ -3664,7 +3664,7 @@ class ASTBuilder:
         elif typetodo.type == typeEnum.BOOL:
             where.append([llvmEnum.Alloca, target, 'i32'])
         else:
-            raise Exception("TODO")
+            pass
 
     def getname(self, name):
         for i in range(len(self.NameSpace) - 1, -1, -1):
