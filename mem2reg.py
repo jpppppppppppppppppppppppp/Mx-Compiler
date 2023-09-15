@@ -251,15 +251,15 @@ class mem2reg:
         for block in self.blocks:
             if block not in self.pre or len(self.pre[block]) == 0 and block != 'entry':
                 todel.append(block)
-        for label in phi:
-            for var in phi[label]:
-                res = [llvmEnum.Phi, phi[label][var]['name'], typelist[var], []]
-                for source in phi[label][var]:
-                    if source in todel:
-                        continue
-                    if source not in ['name', 'type']:
-                        res[-1].append([phi[label][var][source], source])
-                self.blocks[label].insert(1, res)
+        # for label in phi:
+        #     for var in phi[label]:
+        #         res = [llvmEnum.Phi, phi[label][var]['name'], typelist[var], []]
+        #         for source in phi[label][var]:
+        #             if source in todel:
+        #                 continue
+        #             if source not in ['name', 'type']:
+        #                 res[-1].append([phi[label][var][source], source])
+        #         self.blocks[label].insert(1, res)
         # for todo in todel:
         #     for i in range(len(function[2])):
         #         if function[2][i][0][1] == todo:
