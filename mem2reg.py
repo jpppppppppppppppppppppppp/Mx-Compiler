@@ -14,8 +14,8 @@ class mem2reg:
         ret = {}
         for func in allfunc:
             ret[func] = self.opt(allfunc[func])
-            self.deadcode(allfunc[func])
-            self.radicaldeadcode(allfunc, func)
+            # self.deadcode(allfunc[func])
+            # self.radicaldeadcode(allfunc, func)
         return ret
 
     def opt(self, function):
