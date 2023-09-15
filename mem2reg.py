@@ -26,114 +26,114 @@ class mem2reg:
         self.defd.clear()
         self.allocavar.clear()
         typelist = {}
-        for block in function[2]:
-            end = False
-            nowlabel = block[0][1]
-            if nowlabel not in self.next:
-                self.next[nowlabel] = []
-            if nowlabel not in self.pre:
-                self.pre[nowlabel] = []
-            self.blocks[nowlabel] = block
-            for i in range(len(block)):
-                smt = block[i]
-                if end:
-                    smt[0] = llvmEnum.Pass
-                    continue
-                if smt[0] == llvmEnum.Jump:
-                    self.next[nowlabel].append(smt[1])
-                    if smt[1] not in self.pre:
-                        self.pre[smt[1]] = []
-                    self.pre[smt[1]].append(nowlabel)
-                    end = True
-                elif smt[0] == llvmEnum.Br:
-                    self.next[nowlabel].append(smt[2])
-                    if smt[2] not in self.pre:
-                        self.pre[smt[2]] = []
-                    self.pre[smt[2]].append(nowlabel)
-                    self.next[nowlabel].append(smt[3])
-                    if smt[3] not in self.pre:
-                        self.pre[smt[3]] = []
-                    self.pre[smt[3]].append(nowlabel)
-                    if smt[1] not in self.used:
-                        self.used[smt[1]] = []
-                    self.used[smt[1]].append([nowlabel, i])
-                    end = True
-                elif smt[0] == llvmEnum.Return:
-                    if smt[2] not in self.used:
-                        self.used[smt[2]] = []
-                    self.used[smt[2]].append([nowlabel, i])
-                    end = True
-                elif smt[0] == llvmEnum.ReturnVoid:
-                    end = True
-                elif smt[0] == llvmEnum.Alloca:
-                    typelist[smt[1]] = smt[2]
-                    if smt[1] not in self.allocavar:
-                        self.allocavar.append(smt[1])
-                    if smt[1] not in self.defd:
-                        self.defd[smt[1]] = {}
-                    self.defd[smt[1]][nowlabel] = ['alloca', i]
-                elif smt[0] == llvmEnum.Load:
-                    if smt[3] not in self.used:
-                        self.used[smt[3]] = []
-                    self.used[smt[3]].append([nowlabel, i])
-                elif smt[0] == llvmEnum.Getelementptr1:
-                    if smt[3] not in self.used:
-                        self.used[smt[3]] = []
-                    self.used[smt[3]].append([nowlabel, i])
-                    if smt[4] not in self.used:
-                        self.used[smt[4]] = []
-                    self.used[smt[4]].append([nowlabel, i])
-                elif smt[0] == llvmEnum.Getelementptr2:
-                    if smt[3] not in self.used:
-                        self.used[smt[3]] = []
-                    self.used[smt[3]].append([nowlabel, i])
-                    if smt[4] not in self.used:
-                        self.used[smt[4]] = []
-                    self.used[smt[4]].append([nowlabel, i])
-                elif smt[0] == llvmEnum.Trunc:
-                    if smt[2] not in self.used:
-                        self.used[smt[2]] = []
-                    self.used[smt[2]].append([nowlabel, i])
-                elif smt[0] == llvmEnum.Zext:
-                    if smt[2] not in self.used:
-                        self.used[smt[2]] = []
-                    self.used[smt[2]].append([nowlabel, i])
-                elif smt[0] == llvmEnum.Phi:
-                    for use in smt[3]:
-                        if use[0] not in self.used:
-                            self.used[use[0]] = []
-                        self.used[use[0]].append([nowlabel, i])
-                elif smt[0] == llvmEnum.Icmp:
-                    if smt[4] not in self.used:
-                        self.used[smt[4]] = []
-                    self.used[smt[4]].append([nowlabel, i])
-                    if smt[5] not in self.used:
-                        self.used[smt[5]] = []
-                    self.used[smt[5]].append([nowlabel, i])
-                elif smt[0] == llvmEnum.Store:
-                    if smt[2] not in self.used:
-                        self.used[smt[2]] = []
-                    self.used[smt[2]].append([nowlabel, i])
-                    if smt[3] not in self.defd:
-                        self.defd[smt[3]] = {}
-                    self.defd[smt[3]][nowlabel] = [smt[2], i]
-                elif smt[0] == llvmEnum.Binary:
-                    if smt[4] not in self.used:
-                        self.used[smt[4]] = []
-                    self.used[smt[4]].append([nowlabel, i])
-                    if smt[5] not in self.used:
-                        self.used[smt[5]] = []
-                    self.used[smt[5]].append([nowlabel, i])
-                elif smt[0] == llvmEnum.FuncCall:
-                    for arg in smt[4]:
-                        if arg[1] not in self.used:
-                            self.used[arg[1]] = []
-                        self.used[arg[1]].append([nowlabel, i])
-                elif smt[0] == llvmEnum.FuncVoid:
-                    for arg in smt[2]:
-                        if arg[1] not in self.used:
-                            self.used[arg[1]] = []
-                        self.used[arg[1]].append([nowlabel, i])
+        # for block in function[2]:
+        #     end = False
+        #     nowlabel = block[0][1]
+        #     if nowlabel not in self.next:
+        #         self.next[nowlabel] = []
+        #     if nowlabel not in self.pre:
+        #         self.pre[nowlabel] = []
+        #     self.blocks[nowlabel] = block
+        #     for i in range(len(block)):
+        #         smt = block[i]
+        #         if end:
+        #             smt[0] = llvmEnum.Pass
+        #             continue
+        #         if smt[0] == llvmEnum.Jump:
+        #             self.next[nowlabel].append(smt[1])
+        #             if smt[1] not in self.pre:
+        #                 self.pre[smt[1]] = []
+        #             self.pre[smt[1]].append(nowlabel)
+        #             end = True
+        #         elif smt[0] == llvmEnum.Br:
+        #             self.next[nowlabel].append(smt[2])
+        #             if smt[2] not in self.pre:
+        #                 self.pre[smt[2]] = []
+        #             self.pre[smt[2]].append(nowlabel)
+        #             self.next[nowlabel].append(smt[3])
+        #             if smt[3] not in self.pre:
+        #                 self.pre[smt[3]] = []
+        #             self.pre[smt[3]].append(nowlabel)
+        #             if smt[1] not in self.used:
+        #                 self.used[smt[1]] = []
+        #             self.used[smt[1]].append([nowlabel, i])
+        #             end = True
+        #         elif smt[0] == llvmEnum.Return:
+        #             if smt[2] not in self.used:
+        #                 self.used[smt[2]] = []
+        #             self.used[smt[2]].append([nowlabel, i])
+        #             end = True
+        #         elif smt[0] == llvmEnum.ReturnVoid:
+        #             end = True
+        #         elif smt[0] == llvmEnum.Alloca:
+        #             typelist[smt[1]] = smt[2]
+        #             if smt[1] not in self.allocavar:
+        #                 self.allocavar.append(smt[1])
+        #             if smt[1] not in self.defd:
+        #                 self.defd[smt[1]] = {}
+        #             self.defd[smt[1]][nowlabel] = ['alloca', i]
+        #         elif smt[0] == llvmEnum.Load:
+        #             if smt[3] not in self.used:
+        #                 self.used[smt[3]] = []
+        #             self.used[smt[3]].append([nowlabel, i])
+        #         elif smt[0] == llvmEnum.Getelementptr1:
+        #             if smt[3] not in self.used:
+        #                 self.used[smt[3]] = []
+        #             self.used[smt[3]].append([nowlabel, i])
+        #             if smt[4] not in self.used:
+        #                 self.used[smt[4]] = []
+        #             self.used[smt[4]].append([nowlabel, i])
+        #         elif smt[0] == llvmEnum.Getelementptr2:
+        #             if smt[3] not in self.used:
+        #                 self.used[smt[3]] = []
+        #             self.used[smt[3]].append([nowlabel, i])
+        #             if smt[4] not in self.used:
+        #                 self.used[smt[4]] = []
+        #             self.used[smt[4]].append([nowlabel, i])
+        #         elif smt[0] == llvmEnum.Trunc:
+        #             if smt[2] not in self.used:
+        #                 self.used[smt[2]] = []
+        #             self.used[smt[2]].append([nowlabel, i])
+        #         elif smt[0] == llvmEnum.Zext:
+        #             if smt[2] not in self.used:
+        #                 self.used[smt[2]] = []
+        #             self.used[smt[2]].append([nowlabel, i])
+        #         elif smt[0] == llvmEnum.Phi:
+        #             for use in smt[3]:
+        #                 if use[0] not in self.used:
+        #                     self.used[use[0]] = []
+        #                 self.used[use[0]].append([nowlabel, i])
+        #         elif smt[0] == llvmEnum.Icmp:
+        #             if smt[4] not in self.used:
+        #                 self.used[smt[4]] = []
+        #             self.used[smt[4]].append([nowlabel, i])
+        #             if smt[5] not in self.used:
+        #                 self.used[smt[5]] = []
+        #             self.used[smt[5]].append([nowlabel, i])
+        #         elif smt[0] == llvmEnum.Store:
+        #             if smt[2] not in self.used:
+        #                 self.used[smt[2]] = []
+        #             self.used[smt[2]].append([nowlabel, i])
+        #             if smt[3] not in self.defd:
+        #                 self.defd[smt[3]] = {}
+        #             self.defd[smt[3]][nowlabel] = [smt[2], i]
+        #         elif smt[0] == llvmEnum.Binary:
+        #             if smt[4] not in self.used:
+        #                 self.used[smt[4]] = []
+        #             self.used[smt[4]].append([nowlabel, i])
+        #             if smt[5] not in self.used:
+        #                 self.used[smt[5]] = []
+        #             self.used[smt[5]].append([nowlabel, i])
+        #         elif smt[0] == llvmEnum.FuncCall:
+        #             for arg in smt[4]:
+        #                 if arg[1] not in self.used:
+        #                     self.used[arg[1]] = []
+        #                 self.used[arg[1]].append([nowlabel, i])
+        #         elif smt[0] == llvmEnum.FuncVoid:
+        #             for arg in smt[2]:
+        #                 if arg[1] not in self.used:
+        #                     self.used[arg[1]] = []
+        #                 self.used[arg[1]].append([nowlabel, i])
         d = {}
         # for label in self.blocks:
         #     d[label] = set()
