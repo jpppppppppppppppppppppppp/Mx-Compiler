@@ -2188,7 +2188,7 @@ declare ptr @malloc(i32)
             bodyptr = self.getelementptr(init.expr.body)
             newvar = f"%._{self.Scopes[-1].tempvar}"
             self.Scopes[-1].tempvar += 1
-            self.generateload(self.llvmfunc[funcname][2][0], typetodo, newvar, bodyptr)
+            self.generateload(self.llvmfunc[funcname][2][0], typetodo, bodyptr, newvar)
             newvars = f"%._{self.Scopes[-1].tempvar}"
             self.Scopes[-1].tempvar += 1
             if init.expr.op == '++':
@@ -2875,6 +2875,9 @@ declare ptr @malloc(i32)
             else:
                 retNode = f"%._{self.Scopes[-1].tempvar}"
                 self.Scopes[-1].tempvar += 1
+                if node.returnExpr == None:
+                    while True:
+                        pass
                 self.generateload(where, self.typeget(node.returnExpr)[0], node.returnExpr, retNode)
             typetodo = self.typeget(node.returnExpr)[0]
             self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append([llvmEnum.Store, self.llvmtypeclass(typetodo), retNode, "%.return"])
@@ -3547,9 +3550,6 @@ declare ptr @malloc(i32)
             self.generateFuncCall(where, typetodo, 'malloc', [str(self.sizebank[typetodo.name])], target)
             if self.ClassBank[typetodo.name].ConstructFunc != ASTEmptyNode():
                 self.generateFuncCall(where, typeclass(t=typeEnum.VOID), f"CLASS.{typetodo.name}.{typetodo.name}", [target], None)
-        elif vars == None:
-            while True:
-                pass
         else:
             raise Exception("TODO")
 
