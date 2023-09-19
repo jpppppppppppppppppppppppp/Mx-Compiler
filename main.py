@@ -3547,6 +3547,9 @@ declare ptr @malloc(i32)
             self.generateFuncCall(where, typetodo, 'malloc', [str(self.sizebank[typetodo.name])], target)
             if self.ClassBank[typetodo.name].ConstructFunc != ASTEmptyNode():
                 self.generateFuncCall(where, typeclass(t=typeEnum.VOID), f"CLASS.{typetodo.name}.{typetodo.name}", [target], None)
+        elif vars == None:
+            while True:
+                pass
         else:
             raise Exception("TODO")
 
