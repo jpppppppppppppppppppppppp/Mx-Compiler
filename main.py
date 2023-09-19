@@ -2875,9 +2875,6 @@ declare ptr @malloc(i32)
             else:
                 retNode = f"%._{self.Scopes[-1].tempvar}"
                 self.Scopes[-1].tempvar += 1
-                if node.returnExpr == None:
-                    while True:
-                        pass
                 self.generateload(where, self.typeget(node.returnExpr)[0], node.returnExpr, retNode)
             typetodo = self.typeget(node.returnExpr)[0]
             self.llvmfunc[self.getfuncname()][2][self.Scopes[-1].dim].append([llvmEnum.Store, self.llvmtypeclass(typetodo), retNode, "%.return"])
@@ -3043,14 +3040,14 @@ declare ptr @malloc(i32)
         self.generatejump(root[self.Scopes[-1].dim], forcond)
         self.Scopes[-1].dim = forcondind
         self.generateloopcondition(root[self.Scopes[-1].dim], node.endCondition, forbody, forend)
+        self.Scopes[-1].dim = forincind
+        self.generateloopinc(root[self.Scopes[-1].dim], node.step, forcond)
         self.Scopes[-1].dim = forbodyind
         self.generateloopbody(root[self.Scopes[-1].dim], node.Smt, forinc)
         self.Scopes[-2].dim = self.Scopes[-1].dim
         self.Scopes[-2].tempvar = self.Scopes[-1].tempvar
         self.Scopes.pop()
         self.NameSpace.pop()
-        self.Scopes[-1].dim = forincind
-        self.generateloopinc(root[self.Scopes[-1].dim], node.step, forcond)
         self.Scopes[-1].dim = forendind
 
     def llvmASTLoopWhileNode(self, node):
