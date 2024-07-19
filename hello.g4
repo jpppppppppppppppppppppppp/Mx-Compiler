@@ -59,7 +59,7 @@ bracketwithargs :   '['expression ']'   ;
 bracketwithoutargs  :   '['']'  ;
 
 constexpression
-    :   Interger                                                                                                        # Numconstexpression
+    :   Integer                                                                                                        # Numconstexpression
     |   String                                                                                                          # Stringconstexpression
     |  ( TRUE | FALSE)                                                                                                  # Boolconstexpression
     |   NULL                                                                                                            # Nullconstexpression
@@ -122,7 +122,7 @@ LineComment: '//' ~[\r\n]* -> channel(HIDDEN);
 
 BlockComment: '/*' .*? '*/' -> channel(HIDDEN);
 
-Interger
+Integer
     :   '0'
     |   [1-9][0-9]*
     ;
